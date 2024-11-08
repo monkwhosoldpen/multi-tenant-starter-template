@@ -17,46 +17,6 @@ const navigationItems: SidebarItem[] = [
     name: 'Management',
   },
   {
-    name: "Products",
-    href: "/products",
-    icon: ShoppingBag,
-    type: "item",
-  },
-  {
-    name: "People",
-    href: "/people",
-    icon: Users,
-    type: "item",
-  },
-  {
-    name: "Segments",
-    href: "/segments",
-    icon: Columns3,
-    type: "item",
-  },
-  {
-    name: "Regions",
-    href: "/regions",
-    icon: Locate,
-    type: "item",
-  },
-  {
-    type: 'label',
-    name: 'Monetization',
-  },
-  {
-    name: "Revenue",
-    href: "/revenue",
-    icon: BarChart4,
-    type: "item",
-  },
-  {
-    name: "Orders",
-    href: "/orders",
-    icon: ShoppingCart,
-    type: "item",
-  },
-  {
     name: "Discounts",
     href: "/discounts",
     icon: BadgePercent,
@@ -74,11 +34,27 @@ const navigationItems: SidebarItem[] = [
   },
 ];
 
+const superAdminNavigationItems: SidebarItem[] = [
+  {
+    name: "Advanced Settings",
+    href: "/advanced-settings",
+    icon: Users,
+    type: "item",
+  },
+];
+
 export default function Layout(props: { children: React.ReactNode }) {
   const params = useParams<{ teamId: string }>();
-  const user = useUser({ or: 'redirect' });
+  const user: any = useUser({ or: 'redirect' });
   const team = user.useTeam(params.teamId);
   const router = useRouter();
+
+  const superAdminEmail = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL;
+  const isSuperAdmin = user?.primaryEmail === superAdminEmail;
+
+  const _navigationItems = isSuperAdmin ?
+    [...navigationItems, ...superAdminNavigationItems] :
+    [...navigationItems];
 
   if (!team) {
     router.push('/dashboard');
@@ -86,10 +62,10 @@ export default function Layout(props: { children: React.ReactNode }) {
   }
 
   return (
-    <SidebarLayout 
-      items={navigationItems}
+    <SidebarLayout
+      items={_navigationItems}
       basePath={`/dashboard/${team.id}`}
-      sidebarTop={<SelectedTeamSwitcher 
+      sidebarTop={<SelectedTeamSwitcher
         selectedTeam={team}
         urlMap={(team) => `/dashboard/${team.id}`}
       />}

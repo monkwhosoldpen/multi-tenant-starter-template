@@ -1,18 +1,11 @@
 // src/lib/supabaseClient.ts
+import { supabase } from "@/lib/supabaseClient";
 import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from "react";
 
 // Step 1: Setup for Master Supabase Client (your existing setup)
 const supabaseUrl: any = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey: any = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase = createClient<any>(supabaseUrl, supabaseKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 20,
-    },
-  },
-});
 
 // Interface for Tenant Configuration
 interface Config {
