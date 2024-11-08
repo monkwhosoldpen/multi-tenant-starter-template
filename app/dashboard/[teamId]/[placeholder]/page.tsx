@@ -7,11 +7,11 @@ export default function Page({
   params: { placeholder: string; teamId: string };
 }) {
   return (
-    <DashboardPage placeholder={params.placeholder} />
+    <MyComponent placeholder={params.placeholder} />
   )
 }
 
-export function DashboardPage({ placeholder }: { placeholder: string }) {
+function MyComponent({ placeholder }: { placeholder: string }) {
   return (
     <>
       <div className="flex-col">
