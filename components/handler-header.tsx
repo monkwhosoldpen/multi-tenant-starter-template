@@ -7,17 +7,20 @@ import { Logo } from "./logo";
 export default function HandlerHeader() {
   const user = useUser();
   const { theme, setTheme } = useTheme();
+  const superAdminEmail = process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL;
 
   return (
     <>
       <header className="fixed w-full z-50 p-4 h-14 flex items-center py-4 border-b justify-between bg-background">
-        <Logo link={user ? "/dashboard" : "/"}/>
-
+        <Logo link={user ? "/dashboard" : "/"} />
+        {user?.primaryEmail === superAdminEmail ? "SUPER ADMIN" : ""}
         <div className="flex items-center justify-end gap-5">
-          <UserButton colorModeToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+          <div className="flex flex-col items-end">
+            <UserButton showUserInfo={false} colorModeToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
+          </div>
         </div>
       </header>
-      <div className="min-h-14"/> {/* Placeholder for fixed header */}
+      <div className="min-h-14" /> {/* Placeholder for fixed header */}
     </>
   );
 }
