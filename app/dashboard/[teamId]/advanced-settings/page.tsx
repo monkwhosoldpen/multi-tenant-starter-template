@@ -1,5 +1,10 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/lib/supabaseClient";
 import React, { useEffect, useState } from "react";
 
@@ -72,55 +77,91 @@ const AdvancedSettings = () => {
     }));
   };
 
+  if (loading) {
+    return (
+      <div className="space-y-4 p-6">
+        <Skeleton className="h-8 w-[200px]" />
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-[300px]" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-[300px]" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-[300px]" />
+          <Skeleton className="h-12 w-full" />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="settings-container">
-      {loading ? (
-        <p>Loading...</p>
-      ) : (
-        <form className="settings-form">
-          <div>
-            <label>Supabase URL</label>
-            <input
-              type="text"
-              name="supabase_url"
-              value={config.supabase_url}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div>
-            <label>Supabase Anonymous Key</label>
-            <input
-              type="text"
-              name="supabase_anon_key"
-              value={config.supabase_anon_key}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div>
-            <label>Super Admin Email</label>
-            <input
-              type="email"
-              name="super_admin_email"
-              value={config.super_admin_email}
-              onChange={handleChange}
-            />
-          </div>
-
-          {success !== null && (
-            <div>
-              <p className={success ? "text-green-500" : "text-red-500"}>
-                {success ? "Configuration saved successfully!" : error}
-              </p>
+    <div className="p-6 max-w-2xl mx-auto">
+      <Card>
+        <CardHeader>
+          <CardTitle>Advanced Settings</CardTitle>
+          <CardDescription>
+            Configure your Supabase connection and admin settings.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="supabase_url">Supabase URL</Label>
+              <Input
+                id="supabase_url"
+                name="supabase_url"
+                value={config.supabase_url}
+                onChange={handleChange}
+                placeholder="https://your-project.supabase.co"
+              />
             </div>
-          )}
 
-          <button type="button" onClick={handleSave} disabled={loading}>
-            {loading ? "Saving..." : "Save Configuration"}
-          </button>
-        </form>
-      )}
+            <div className="space-y-2">
+              <Label htmlFor="supabase_anon_key">Supabase Anonymous Key</Label>
+              <Input
+                id="supabase_anon_key"
+                name="supabase_anon_key"
+                value={config.supabase_anon_key}
+                onChange={handleChange}
+                type="password"
+                placeholder="your-anon-key"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="super_admin_email">Super Admin Email</Label>
+              <Input
+                id="super_admin_email"
+                name="super_admin_email"
+                value={config.super_admin_email}
+                onChange={handleChange}
+                type="email"
+                placeholder="admin@example.com"
+              />
+            </div>
+
+            {success !== null && (
+              <div className={success ? "text-green-500" : "text-destructive"}>
+                <p>
+                  {success ? "Configuration saved successfully!" : error}
+                </p>
+              </div>
+            )}
+
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading ? "Saving..." : "Save Configuration"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
