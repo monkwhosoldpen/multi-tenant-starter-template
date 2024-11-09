@@ -151,7 +151,7 @@ function LayoutContent({ children, team }: { children: React.ReactNode, team: an
                 🛠️ Maintenance in Progress
               </CardTitle>
               <CardDescription>
-                We're currently performing scheduled maintenance to improve our services.
+                We&apos;re currently performing scheduled maintenance to improve our services.
                 Please check back later. We apologize for any inconvenience.
                 <div className="mt-4 text-sm">
                   <strong>Expected completion:</strong> Within 2 hours
