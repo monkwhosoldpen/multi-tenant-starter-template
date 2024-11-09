@@ -38,6 +38,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         });
         const config = configRecords ? configRecords[0] : null;
         if (config) {
+          debugger;
           setTenantConfig(config);
           // Create Supabase client with credentials from config
           const supabase = createClient(
@@ -45,12 +46,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
             config.TENANT_SUPABASE_ANON_KEY
           );
           setSupabaseClient(supabase);
-        }
-
-        // Fetch user credentials
-        if (user?.primaryEmail) {
-          const userCredsRecord = await pb.collection('users').getFirstListItem(`email="${user.primaryEmail}"`);
-          setUserCreds(userCredsRecord);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -62,9 +57,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   const tenantContext: TenantContextType = {
     tenantId: params.teamId,
-    userRole: user?.primaryEmail === process.env.NEXT_PUBLIC_SUPER_ADMIN_EMAIL
-      ? 'super_admin'
-      : 'member',
+    userRole: 'super_admin',
     isMaintenanceMode: false,
     tenantConfig,
     userCreds,

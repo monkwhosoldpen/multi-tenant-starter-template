@@ -6,10 +6,7 @@ import { BadgePercent, BarChart4, Columns3, Globe, Locate, Settings2, ShoppingBa
 import { useParams, useRouter } from "next/navigation";
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { createClient } from "@supabase/supabase-js";
-import { supabase } from "@/lib/supabaseClient";
 import useTenant, { TenantProvider } from "@/lib/usetenant";
-
 
 const baseNavigationItems: SidebarItem[] = [
   {
