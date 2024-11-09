@@ -13,6 +13,8 @@ type TenantContextType = {
   tenantConfig: any | null;
   userCreds: any | null;
   tenantSupabase: any;
+  isLoading: boolean;
+  error: Error | null;
 };
 
 const TenantContext = createContext<TenantContextType | undefined>(undefined);
@@ -28,31 +30,51 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenantConfig, setTenantConfig] = useState<any | null>(null);
   const [userCreds, setUserCreds] = useState<any | null>(null);
   const [supabaseClient, setSupabaseClient] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchData = async () => {
+      if (!user?.primaryEmail) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
       try {
-        // Fetch tenant config with Supabase credentials
         const configRecords = await pb.collection('tenant_config').getFullList({
           sort: '-created',
         });
-        const config = configRecords ? configRecords[0] : null;
+        
+        if (!isMounted) return;
+
+        const config = configRecords?.[0] ?? null;
         if (config) {
-          debugger;
           setTenantConfig(config);
-          // Create Supabase client with credentials from config
+          
           const supabase = createClient(
             config.TENANT_PUBLIC_SUPABASE_URL,
             config.TENANT_SUPABASE_ANON_KEY
           );
           setSupabaseClient(supabase);
         }
-      } catch (error) {
-        console.error('Error fetching data:', error);
+      } catch (err) {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err : new Error('Failed to fetch tenant config'));
+        console.error('Error fetching data:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user?.primaryEmail]);
 
   const tenantContext: TenantContextType = {
@@ -61,7 +83,9 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     isMaintenanceMode: false,
     tenantConfig,
     userCreds,
-    tenantSupabase: supabaseClient
+    tenantSupabase: supabaseClient,
+    isLoading,
+    error
   };
 
   return (
