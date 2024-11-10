@@ -22,7 +22,8 @@ export default function RootLayout({
       <body className={inter.className}>
         <Provider>
           <StackProvider app={stackServerApp}>
-            <StackTheme>{children}</StackTheme>
+            <StackTheme>
+              {children}</StackTheme>
           </StackProvider>
         </Provider>
       </body>

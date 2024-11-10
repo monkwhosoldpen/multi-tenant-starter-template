@@ -7,6 +7,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import useTenant, { TenantProvider } from "@/lib/usetenant";
+import { ContactAdminMessage } from "@/components/contact-admin-message";
 
 const baseNavigationItems: SidebarItem[] = [
   {
@@ -143,26 +144,7 @@ function LayoutContent({ children, team }: { children: React.ReactNode, team: an
         href: `/dashboard/${team.id}`,
       }]}
     >
-      {isMaintenanceMode ? (
-        <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
-          <Card className="w-[420px]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                🛠️ Maintenance in Progress
-              </CardTitle>
-              <CardDescription>
-                We&apos;re currently performing scheduled maintenance to improve our services.
-                Please check back later. We apologize for any inconvenience.
-                <div className="mt-4 text-sm">
-                  <strong>Expected completion:</strong> Within 2 hours
-                </div>
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      ) : (
-        children
-      )}
+      {isMaintenanceMode ? <ContactAdminMessage /> : children}
     </SidebarLayout>
   );
 }

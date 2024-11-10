@@ -12,7 +12,7 @@ export default function HandlerHeader() {
   return (
     <>
       <header className="fixed w-full z-50 p-4 h-14 flex items-center py-4 border-b justify-between bg-background">
-        <Logo link={user ? "/dashboard" : "/"} />
+        <Logo link={user ? "/" : "/"} />
         {user?.primaryEmail === superAdminEmail ? "SUPER ADMIN" : ""}
         <div className="flex items-center justify-end gap-5">
           <div className="flex flex-col items-end">

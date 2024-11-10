@@ -23,7 +23,7 @@ import PocketBase from 'pocketbase';
 
 export function TenantProvider({ children }: { children: ReactNode }) {
 
-  const pb = new PocketBase('https://fixdpocketbase.pockethost.io');
+  const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL);
 
   const params = useParams<{ teamId: string }>();
   const user: any = useUser({ or: 'redirect' });
