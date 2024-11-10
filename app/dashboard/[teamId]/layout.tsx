@@ -2,12 +2,11 @@
 
 import SidebarLayout, { SidebarItem } from "@/components/sidebar-layout";
 import { SelectedTeamSwitcher, useUser } from "@stackframe/stack";
-import { BadgePercent, BarChart4, Columns3, Globe, Locate, Settings2, ShoppingBag, ShoppingCart, Users } from "lucide-react";
+import { BarChart4, CalendarDays, Globe, MessageSquare, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import useTenant, { TenantProvider } from "@/lib/usetenant";
+import useTenant, { TenantProvider, } from "@/lib/usetenant";
 import { ContactAdminMessage } from "@/components/contact-admin-message";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const baseNavigationItems: SidebarItem[] = [
   {
@@ -18,63 +17,185 @@ const baseNavigationItems: SidebarItem[] = [
   },
 ];
 
-const memberNavigationItems: SidebarItem[] = [
+const fieldStaffNavigationItems: SidebarItem[] = [
   ...baseNavigationItems,
   {
     type: 'label',
-    name: 'Management',
+    name: 'Field Operations',
   },
   {
-    name: "Discounts",
-    href: "/discounts",
-    icon: BadgePercent,
+    name: "Voter Registration",
+    href: "/voter-registration",
+    icon: Users,
+    type: "item",
+  },
+  {
+    name: "Event Planning",
+    href: "/event-planning",
+    icon: CalendarDays,
+    type: "item",
+  },
+];
+
+const coordinatorNavigationItems: SidebarItem[] = [
+  ...fieldStaffNavigationItems,
+  {
+    type: 'label',
+    name: 'Coordination',
+  },
+  {
+    name: "Communications",
+    href: "/communications",
+    icon: MessageSquare,
+    type: "item",
+  },
+  {
+    name: "Analytics",
+    href: "/analytics",
+    icon: BarChart4,
     type: "item",
   },
 ];
 
 const adminNavigationItems: SidebarItem[] = [
-  ...memberNavigationItems,
+  ...coordinatorNavigationItems,
   {
     type: 'label',
-    name: 'Settings',
+    name: 'Administration',
   },
   {
-    name: "Configuration",
-    href: "/configuration",
-    icon: Settings2,
-    type: "item",
-  },
-];
-
-const superAdminNavigationItems: SidebarItem[] = [
-  ...adminNavigationItems,
-  {
-    type: 'label',
-    name: 'Super Admin',
-  },
-  {
-    name: "Advanced Settings",
-    href: "/advanced-settings",
+    name: "Field Coordinator",
+    href: "/field-coordinator",
     icon: Users,
     type: "item",
   },
 ];
 
-type UserRole = 'super_admin' | 'admin' | 'member' | 'guest';
+// All navigation items combined for superadmin
+const superAdminNavigationItems: SidebarItem[] = [
+  ...baseNavigationItems,
+  {
+    type: 'label',
+    name: 'Field Operations',
+  },
+  {
+    name: "Voter Registration",
+    href: "/voter-registration",
+    icon: Users,
+    type: "item",
+  },
+  {
+    name: "Event Planning",
+    href: "/event-planning",
+    icon: CalendarDays,
+    type: "item",
+  },
+  {
+    type: 'label',
+    name: 'Coordination',
+  },
+  {
+    name: "Communications",
+    href: "/communications",
+    icon: MessageSquare,
+    type: "item",
+  },
+  {
+    name: "Analytics",
+    href: "/analytics",
+    icon: BarChart4,
+    type: "item",
+  },
+  {
+    type: 'label',
+    name: 'Administration',
+  },
+  {
+    name: "Field Coordinator",
+    href: "/field-coordinator",
+    icon: Users,
+    type: "item",
+  },
+];
+
+type UserRole = 
+  | 'superadmin'
+  | 'field-coordinator'
+  | 'field-organizer'
+  | 'canvassing-team'
+  | 'voter-registration-team'
+  | 'event-planning-team'
+  | 'communications-team'
+  | 'data-collection-and-analysis-team'
+  | 'transportation-and-logistics-team'
+  | 'volunteer-team'
+  | 'polling-team-election-day-team'
+  | 'media-outreach-and-social-media-team'
+  | 'guest';
 
 const getNavigationItemsByRole = (role: UserRole): SidebarItem[] => {
-  switch (role) {
-    case 'super_admin':
-      return superAdminNavigationItems;
-    case 'admin':
-      return adminNavigationItems;
-    case 'member':
-      return memberNavigationItems;
-    case 'guest':
-      return baseNavigationItems;
-    default:
-      return baseNavigationItems;
-  }
+  // switch (role) {
+  //   case 'superadmin':
+  //     return superAdminNavigationItems;
+  //   case 'field-coordinator':
+  //     return adminNavigationItems;
+  //   case 'field-organizer':
+  //   case 'data-collection-and-analysis-team':
+  //     return coordinatorNavigationItems;
+  //   case 'communications-team':
+  //   case 'media-outreach-and-social-media-team':
+  //     return [
+  //       ...baseNavigationItems,
+  //       {
+  //         type: 'label',
+  //         name: 'Communications',
+  //       },
+  //       {
+  //         name: "Communications",
+  //         href: "/communications",
+  //         icon: MessageSquare,
+  //         type: "item",
+  //       },
+  //     ];
+  //   case 'event-planning-team':
+  //     return [
+  //       ...baseNavigationItems,
+  //       {
+  //         type: 'label',
+  //         name: 'Events',
+  //       },
+  //       {
+  //         name: "Event Planning",
+  //         href: "/event-planning",
+  //         icon: CalendarDays,
+  //         type: "item",
+  //       },
+  //     ];
+  //   case 'voter-registration-team':
+  //     return [
+  //       ...baseNavigationItems,
+  //       {
+  //         type: 'label',
+  //         name: 'Registration',
+  //       },
+  //       {
+  //         name: "Voter Registration",
+  //         href: "/voter-registration",
+  //         icon: Users,
+  //         type: "item",
+  //       },
+  //     ];
+  //   case 'canvassing-team':
+  //   case 'transportation-and-logistics-team':
+  //   case 'volunteer-team':
+  //   case 'polling-team-election-day-team':
+  //     return fieldStaffNavigationItems;
+  //   case 'guest':
+  //     return baseNavigationItems;
+  //   default:
+  //     return baseNavigationItems;
+  // }
+  return superAdminNavigationItems;
 };
 
 export default function Layout(props: { children: React.ReactNode }) {
@@ -97,14 +218,13 @@ export default function Layout(props: { children: React.ReactNode }) {
   );
 }
 
-// Add this new component
 function LayoutContent({ children, team }: { children: React.ReactNode, team: any }) {
   const { userRole, isMaintenanceMode, tenantConfig } = useTenant();
   
   if (!tenantConfig) {
     return (
       <SidebarLayout
-        items={getNavigationItemsByRole(userRole)}
+        items={getNavigationItemsByRole(userRole as UserRole)}
         basePath={`/dashboard/${team.id}`}
         sidebarTop={<SelectedTeamSwitcher
           selectedTeam={team}
@@ -133,7 +253,7 @@ function LayoutContent({ children, team }: { children: React.ReactNode, team: an
 
   return (
     <SidebarLayout
-      items={getNavigationItemsByRole(userRole)}
+      items={getNavigationItemsByRole(userRole as UserRole)}
       basePath={`/dashboard/${team.id}`}
       sidebarTop={<SelectedTeamSwitcher
         selectedTeam={team}
