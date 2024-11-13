@@ -1,58 +1,46 @@
 export const roles = [
-    {
-        "role": "Field Coordinator",
-        "slug": "field-coordinator",
-        "description": "Oversees the field staff and ensures that all campaign activities are aligned with the strategy."
-    },
-    {
-        "role": "Field Organizer",
-        "slug": "field-organizer",
-        "description": "Leads grassroots efforts in specific areas of the constituency, engages with voters, organizes events, and drives campaign initiatives."
-    },
-    {
-        "role": "Canvassing Team",
-        "slug": "canvassing-team",
-        "description": "Responsible for door-to-door outreach, gathering voter information, and persuading undecided voters."
-    },
-    {
-        "role": "Voter Registration Team",
-        "slug": "voter-registration-team",
-        "description": "Ensures eligible voters are registered and helps with the verification of voter rolls."
-    },
-    {
-        "role": "Event Planning Team",
-        "slug": "event-planning-team",
-        "description": "Organizes and manages campaign rallies, town halls, and other public events."
-    },
-    {
-        "role": "Communications Team",
-        "slug": "communications-team",
-        "description": "Manages communication between the campaign and the public."
-    },
-    {
-        "role": "Data Collection and Analysis Team",
-        "slug": "data-collection-and-analysis-team",
-        "description": "Gathers and organizes data on voter preferences, previous voting history, and campaign effectiveness."
-    },
-    {
-        "role": "Transportation and Logistics Team",
-        "slug": "transportation-and-logistics-team",
-        "description": "Coordinates the movement of field staff and materials to various parts of the constituency."
-    },
-    {
-        "role": "Volunteer Team",
-        "slug": "volunteer-team",
-        "description": "Supports the campaign’s activities, assisting with canvassing, phone banking, event support, etc."
-    },
-    {
-        "role": "Polling Team (Election Day Team)",
-        "slug": "polling-team-election-day-team",
-        "description": "Ensures that everything runs smoothly on election day."
-    },
-    {
-        "role": "Media Outreach and Social Media Team",
-        "slug": "media-outreach-and-social-media-team",
-        "description": "Handles the online and offline media outreach for the campaign."
-    }
+  {
+    "role": "Campaign Director",
+    "description": "Oversees all departments, sets overall strategy, and ensures alignment with campaign goals."
+  },
+  {
+    "role": "Operations Director",
+    "description": "Leads the Operations department, ensuring that all operational aspects of the campaign, such as logistics and voter outreach, run smoothly."
+  },
+  {
+    "role": "Field Coordinator",
+    "description": "Manages field staff and coordinates field activities to align with campaign strategy, reporting to the Operations Director."
+  },
+  {
+    "role": "Field Organizer",
+    "description": "Leads grassroots efforts in specific areas, engaging with voters, organizing events, and driving initiatives under the Field Coordinator."
+  },
+  {
+    "role": "Communications Director",
+    "description": "Oversees public communications and social media strategy, managing team members like the Social Media Manager."
+  },
+  {
+    "role": "Social Media Manager",
+    "description": "Handles social media strategy, online engagement, and public image, reporting to the Communications Director."
+  },
+  {
+    "role": "Data and Analysis Director",
+    "description": "Leads data collection, analysis, and reporting to optimize campaign performance, directing the Data Analysis Team."
+  },
+  {
+    "role": "Data Analysis Specialist",
+    "description": "Collects and analyzes voter data, generating reports for strategy adjustments, and reports to the Data and Analysis Director."
+  },
+  {
+    "role": "Volunteer Coordinator",
+    "description": "Manages volunteer recruitment and coordination, working under the Operations Director."
+  },
+  {
+    "role": "Event Planning Director",
+    "description": "Organizes campaign events, rallies, and public meetings, overseeing the Event Planning Team."
+  },
+  {
+    "role": "Polling Team Lead",
+    "description": "Ensures smooth operation on election day, coordinating polling stations and teams."
+  }
 ];
-
