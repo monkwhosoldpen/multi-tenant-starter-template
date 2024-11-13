@@ -17,8 +17,8 @@ import { roles } from "@/lib/roles";
 
 const baseNavigationItems: SidebarItem[] = [
   {
-    name: "Dashboard",
-    href: "/",
+    name: "Overview",
+    href: "/overview",
     icon: LayoutDashboard,
     type: "item",
   },
@@ -76,8 +76,8 @@ const campaignDirectorItems: SidebarItem[] = [
     name: 'Administration'
   },
   {
-    name: "Settings",
-    href: "/settings",
+    name: "Organization Settings",
+    href: "/org-settings",
     icon: Settings,
     type: "item",
   },
@@ -318,6 +318,7 @@ type UserRole =
   | 'guest';
 
 const getNavigationItemsByRole = (role: UserRole): SidebarItem[] => {
+  return campaignDirectorItems;
   switch (role) {
     case 'campaign-director':
       return campaignDirectorItems;
