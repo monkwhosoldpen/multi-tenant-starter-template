@@ -7,9 +7,8 @@ export default function Layout(props: { children: React.ReactNode }) {
       <LandingPageHeader
         items={[
           { title: "Home", href: "/" },
-          { title: "Features", href: "/#features" },
-          { title: "Pricing", href: "/#pricing" },
-          { title: "SuperAdmin", href: "/superadmin" },
+          { title: "GOATS", href: "/superadmin/goats" },
+          { title: "Store", href: "/superadmin/store" },
         ]}
       />
       <main className="flex-1">{props.children}</main>
