@@ -1,4 +1,5 @@
 "use client";
+import { AdminTabs } from "@/components/goats/AdminTabs";
 import GoatsCrud from "@/components/GoatsCRUD";
 import GoatsList from "@/components/GoatsList";
 import { SuperadminProvider } from "@/lib/usesuperamin";
@@ -23,7 +24,8 @@ function MyComponent({ placeholder }: { placeholder: string }) {
               <h2 className="text-2xl font-bold tracking-tight">{placeholder}</h2>
             </div>
 
-            <GoatsCrud />
+            <AdminTabs />
+
           </div>
         </div>
       </SuperadminProvider>

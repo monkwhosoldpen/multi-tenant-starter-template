@@ -2,12 +2,15 @@ import useSuperAdmin from "@/lib/usesuperamin";
 import useTenant from "@/lib/usetenant";
 import { useState, useEffect } from "react";
 import { v4 as uuidv4 } from 'uuid';
-import { Trash2, Eye, Pencil } from 'lucide-react';
+import { Trash2, Eye, Pencil, LayoutGrid, LayoutList } from 'lucide-react';
 import { GoatEditModal } from './GoatEditModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Loader2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "./ui/button";
+import { GoatDetailView } from "./goats/GoatDetailView";
+// import { GoatDetailView } from "./GoatDetailView";
 
 // GoatsList Component using the Tenant Context
 const GoatsCrud: React.FC = () => {
@@ -21,6 +24,7 @@ const GoatsCrud: React.FC = () => {
   const [clearing, setClearing] = useState(false);
   const [mockingMultiple, setMockingMultiple] = useState(false);
   const { fetchGoats, createGoat, deleteGoat, updateGoat, clearAllGoats, mockMultipleGoats } = useSuperAdmin();
+  const [viewMode, setViewMode] = useState<'table' | 'detail'>('table');
 
   const generateRandomName = () => {
     const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'Alex', 'Emma', 'Chris', 'Lisa'];
@@ -323,6 +327,27 @@ const GoatsCrud: React.FC = () => {
   return (
     <div>
       <div className="flex gap-4 mb-4 items-center flex-wrap">
+        <div className="flex items-center border rounded-lg overflow-hidden">
+          <Button
+            variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="rounded-none"
+            onClick={() => setViewMode('table')}
+          >
+            <LayoutList className="h-4 w-4 mr-2" />
+            Table
+          </Button>
+          <Button
+            variant={viewMode === 'detail' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="rounded-none"
+            onClick={() => setViewMode('detail')}
+          >
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Detail
+          </Button>
+        </div>
+
         <button 
           onClick={handleAddGoat}
           disabled={creating}
@@ -404,113 +429,125 @@ const GoatsCrud: React.FC = () => {
         </AlertDialog>
       </div>
 
-      <div className="rounded-md border mt-4">
-        <div className="max-h-[70vh] overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-white dark:bg-gray-950">
-              <TableRow>
-                <TableHead className="w-[50px]">Avatar</TableHead>
-                <TableHead>Username</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Bio</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px] text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
+      {viewMode === 'table' ? (
+        <div className="rounded-md border mt-4">
+          <div className="max-h-[70vh] overflow-auto">
+            <Table>
+              <TableHeader className="sticky top-0 bg-white dark:bg-gray-950">
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    <Loader2 className="h-6 w-6 animate-spin inline-block" />
-                  </TableCell>
+                  <TableHead className="w-[50px]">Avatar</TableHead>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Bio</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="w-[100px] text-right">Actions</TableHead>
                 </TableRow>
-              ) : filteredGoats.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    No goats found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredGoats.map((goat) => (
-                  <TableRow key={goat.uid}>
-                    <TableCell>
-                      <img
-                        src={goat.img_url || "https://via.placeholder.com/100"}
-                        alt={goat.twitter_username}
-                        className="rounded-full w-8 h-8 object-cover"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{goat.username}</span>
-                        <span className="text-xs text-gray-500">@{goat.twitter_username}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset">
-                        {availableCategories.find(cat => cat.locale === goat.type)?.name || goat.type}
-                      </span>
-                    </TableCell>
-                    <TableCell className="max-w-[200px]">
-                      <span className="truncate block">
-                        {goat?.metadata_with_translations?.bio?.english || "NA"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col text-xs gap-1">
-                        {goat.verified && (
-                          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                            Verified
-                          </span>
-                        )}
-                        {goat.is_premium && (
-                          <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
-                            Premium
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedGoat(goat);
-                            setModalMode('view');
-                          }}
-                          className="p-1 rounded-full hover:bg-blue-100 transition-colors"
-                        >
-                          <Eye className="w-4 h-4 text-blue-500" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedGoat(goat);
-                            setModalMode('edit');
-                          }}
-                          className="p-1 rounded-full hover:bg-green-100 transition-colors"
-                        >
-                          <Pencil className="w-4 h-4 text-green-500" />
-                        </button>
-                        <button
-                          onClick={(e) => handleDelete(goat.uid, e)}
-                          disabled={deletingIds.has(goat.uid)}
-                          className="p-1 rounded-full hover:bg-red-100 transition-colors"
-                        >
-                          {deletingIds.has(goat.uid) ? (
-                            <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <Trash2 className="w-4 h-4 text-red-500" />
-                          )}
-                        </button>
-                      </div>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center">
+                      <Loader2 className="h-6 w-6 animate-spin inline-block" />
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                ) : filteredGoats.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center">
+                      No goats found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredGoats.map((goat) => (
+                    <TableRow key={goat.uid}>
+                      <TableCell>
+                        <img
+                          src={goat.img_url || "https://via.placeholder.com/100"}
+                          alt={goat.twitter_username}
+                          className="rounded-full w-8 h-8 object-cover"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{goat.username}</span>
+                          <span className="text-xs text-gray-500">@{goat.twitter_username}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset">
+                          {availableCategories.find(cat => cat.locale === goat.type)?.name || goat.type}
+                        </span>
+                      </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <span className="truncate block">
+                          {goat?.metadata_with_translations?.bio?.english || "NA"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col text-xs gap-1">
+                          {goat.verified && (
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                              Verified
+                            </span>
+                          )}
+                          {goat.is_premium && (
+                            <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
+                              Premium
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedGoat(goat);
+                              setModalMode('view');
+                            }}
+                            className="p-1 rounded-full hover:bg-blue-100 transition-colors"
+                          >
+                            <Eye className="w-4 h-4 text-blue-500" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedGoat(goat);
+                              setModalMode('edit');
+                            }}
+                            className="p-1 rounded-full hover:bg-green-100 transition-colors"
+                          >
+                            <Pencil className="w-4 h-4 text-green-500" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDelete(goat.uid, e)}
+                            disabled={deletingIds.has(goat.uid)}
+                            className="p-1 rounded-full hover:bg-red-100 transition-colors"
+                          >
+                            {deletingIds.has(goat.uid) ? (
+                              <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4 text-red-500" />
+                            )}
+                          </button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </div>
-      </div>
+      ) : (
+        <GoatDetailView
+          goats={filteredGoats}
+          loading={loading}
+          availableCategories={availableCategories}
+          onEdit={(goat) => {
+            setSelectedGoat(goat);
+            setModalMode('edit');
+          }}
+        />
+      )}
 
       {selectedGoat && (
         <GoatEditModal

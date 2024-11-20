@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import useSuperAdmin from "@/lib/usesuperamin";
+import { SubgroupsList } from "./goats/SubgroupsList";
 
 interface GoatEditModalProps {
   isOpen: boolean;
@@ -280,68 +281,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
                 </Button>
               )}
             </div>
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[50px]">Image</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {subgroups.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center py-4 text-sm text-gray-500">
-                        No subgroups found
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    subgroups.map((subgroup) => (
-                      <TableRow key={subgroup.subgroup_id}>
-                        <TableCell>
-                          <img
-                            src={subgroup.img_url || "https://via.placeholder.com/40"}
-                            alt={subgroup.username}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {subgroup.metadata_with_translations?.name?.english || subgroup.username}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              @{subgroup.username}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset">
-                            {subgroup.type}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {subgroup.verified && (
-                              <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                                Verified
-                              </span>
-                            )}
-                            {subgroup.is_premium && (
-                              <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
-                                Premium
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+            <SubgroupsList subgroups={subgroups} />
           </div>
 
           {mode === 'edit' && (
