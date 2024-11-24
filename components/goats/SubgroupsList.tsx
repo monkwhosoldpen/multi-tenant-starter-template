@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, Eye, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type Subgroup = {
+export type Subgroup = {
   subgroup_id: number;
   username: string;
   verified: boolean;
@@ -20,6 +20,11 @@ type Subgroup = {
   cover_url: string;
   type: string;
   is_premium: boolean;
+  is_locked: boolean;
+  is_public: boolean;
+  is_realtime: boolean;
+  is_published: boolean;
+  is_subgroup: boolean;
   owner_username: string;
 };
 
@@ -91,7 +96,7 @@ export function SubgroupsList({
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 flex-wrap">
                     {subgroup.verified && (
                       <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
                         Verified
@@ -100,6 +105,21 @@ export function SubgroupsList({
                     {subgroup.is_premium && (
                       <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
                         Premium
+                      </span>
+                    )}
+                    {subgroup.is_locked && (
+                      <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+                        Locked
+                      </span>
+                    )}
+                    {subgroup.is_public && (
+                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-600/20">
+                        Public
+                      </span>
+                    )}
+                    {subgroup.is_published && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                        Published
                       </span>
                     )}
                   </div>

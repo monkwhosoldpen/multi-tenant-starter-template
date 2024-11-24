@@ -1,23 +1,15 @@
 'use client';
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import useSuperAdmin from "@/lib/usesuperamin";
 import { Button } from "@/components/ui/button";
-import { SubgroupsList } from "./SubgroupsList";
+import { SubgroupsList, Subgroup } from "./SubgroupsList";
 import { Eye, Pencil, Trash2 } from "lucide-react";
-import { AutoComplete } from "@/components/ui/auto-complete";
+import { SUBGROUP_CATEGORIES } from "../GoatsCRUD";
 
-type Goat = {
-  uid: string;
-  username: string;
-  twitter_username: string;
-  img_url?: string;
-};
-
-type SubgroupData = {
+interface SubgroupData {
   subgroup_id: number;
   stream_id: string | null;
   username: string;
@@ -38,8 +30,22 @@ type SubgroupData = {
   cover_url: string;
   type: string;
   is_premium: boolean;
+  is_locked: boolean;
+  is_public: boolean;
+  is_realtime: boolean;
+  is_published: boolean;
   owner_username: string;
-};
+  is_secondary_stream: boolean;
+  is_party: boolean;
+  is_historical: boolean;
+  is_open: boolean;
+  is_demo: boolean;
+  tags: string[];
+  entity_type: string[];
+  blocked_profile_ids: string[];
+  latest_message: any;
+  is_subgroup: boolean;
+}
 
 interface ComponentSubgroup {
   subgroup_id: number;
@@ -57,49 +63,55 @@ interface ComponentSubgroup {
   cover_url: string;
   type: string;
   is_premium: boolean;
+  is_locked: boolean;
+  is_public: boolean;
+  is_realtime: boolean;
+  is_published: boolean;
   owner_username: string;
+  is_secondary_stream: boolean;
+  is_party: boolean;
+  is_historical: boolean;
+  is_open: boolean;
+  is_demo: boolean;
+  stream_id: string | null;
+  tags: string[];
+  entity_type: string[];
+  blocked_profile_ids: string[];
+  latest_message: any;
+  is_subgroup: boolean;
 }
 
-export function SubgroupsTable() {
+interface SubgroupsTableProps {
+  goatId: string;
+  ownerUsername: string;
+  selectedCategory: string;
+}
+
+export function SubgroupsTable({ goatId, ownerUsername, selectedCategory }: SubgroupsTableProps) {
   const [loading, setLoading] = useState(false);
-  const [goats, setGoats] = useState<Goat[]>([]);
-  const [selectedGoat, setSelectedGoat] = useState<string>("");
   const [subgroups, setSubgroups] = useState<SubgroupData[]>([]);
   const [creating, setCreating] = useState(false);
   const [bulkCreating, setBulkCreating] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
-  const { fetchGoats, fetchSubgroups, createSubgroup, createBulkSubgroups, deleteSubgroup } = useSuperAdmin();
+  const { 
+    fetchSubgroups, 
+    createSubgroup, 
+    createBulkSubgroups, 
+    deleteSubgroup,
+    clearAllSubgroups 
+  } = useSuperAdmin();
 
   useEffect(() => {
-    loadGoats();
-  }, []);
-
-  useEffect(() => {
-    if (selectedGoat) {
-      loadSubgroups(selectedGoat);
+    if (ownerUsername) {
+      loadSubgroups(ownerUsername);
     }
-  }, [selectedGoat]);
+  }, [ownerUsername]);
 
-  const loadGoats = async () => {
+  const loadSubgroups = async (username: string) => {
     setLoading(true);
     try {
-      const { data, error } = await fetchGoats();
-      if (error) throw error;
-      setGoats(data || []);
-    } catch (err) {
-      console.error('Error loading goats:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadSubgroups = async (goatId: string) => {
-    setLoading(true);
-    try {
-      const selectedGoatData = goats.find(g => g.uid === goatId);
-      if (!selectedGoatData) throw new Error('Goat not found');
-
-      const { data, error } = await fetchSubgroups(selectedGoatData.username);
+      const { data, error } = await fetchSubgroups(username);
       if (error) throw error;
       setSubgroups(data || []);
     } catch (err) {
@@ -110,39 +122,44 @@ export function SubgroupsTable() {
   };
 
   const handleAddSubgroup = async () => {
-    if (!selectedGoat) return;
+    console.log('Selected Category:', selectedCategory);
+    if (!selectedCategory) {
+      console.log('No category selected');
+      return;
+    }
     setCreating(true);
     try {
-      const selectedGoatData = goats.find(g => g.uid === selectedGoat);
-      if (!selectedGoatData) throw new Error('Goat not found');
-
-      const suffixes = ['twitter', 'fb', 'fans', 'tesla_fans', 'spacex', 'official', 'community', 'updates'];
-      const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-      const username = `${selectedGoatData.username}_${randomSuffix}`.toLowerCase();
+      const username = `${ownerUsername}_${selectedCategory}`.toLowerCase();
+      const capitalizedName = selectedCategory.charAt(0).toUpperCase() + selectedCategory.slice(1);
       
       const mockSubgroup = {
         stream_id: null,
         username,
-        verified: Math.random() > 0.5,
+        verified: false,
         metadata_with_translations: {
           bio: {
-            english: `Official ${randomSuffix.replace('_', ' ')} group`,
+            english: `Official ${capitalizedName} group`,
             hindi: "यादृच्छिक बायो",
             telugu: "యాదృచ్ఛిక జీవితం"
           },
           name: {
-            english: `${username} ${randomSuffix.replace('_', ' ')}`.toUpperCase(),
+            english: capitalizedName,
             hindi: "यादृच्छिक नाम",
             telugu: "యాదృచ్ఛిక పేరు"
           }
         },
         img_url: `https://placehold.co/150?text=${username}`,
         cover_url: `https://placehold.co/600x200?text=${username}`,
-        type: 'TOP',
-        is_premium: Math.random() > 0.7,
-        owner_username: selectedGoatData.username,
+        type: selectedCategory,
+        is_premium: true,
+        is_locked: true,
+        is_public: false,
+        is_realtime: true,
+        is_published: true,
+        is_subgroup: true,
+        owner_username: ownerUsername,
         is_secondary_stream: false,
-        is_party: Math.random() > 0.7,
+        is_party: false,
         is_historical: false,
         is_open: true,
         is_demo: false,
@@ -154,7 +171,7 @@ export function SubgroupsTable() {
       
       const { error } = await createSubgroup(mockSubgroup);
       if (error) throw error;
-      await loadSubgroups(selectedGoat);
+      await loadSubgroups(ownerUsername);
     } catch (err) {
       console.error('Error creating subgroup:', err);
     } finally {
@@ -163,40 +180,40 @@ export function SubgroupsTable() {
   };
 
   const handleBulkCreate = async () => {
-    if (!selectedGoat) return;
     setBulkCreating(true);
     try {
-      const selectedGoatData = goats.find(g => g.uid === selectedGoat);
-      if (!selectedGoatData) throw new Error('Goat not found');
-
-      const mockSubgroups = Array(5).fill(null).map((_, index) => {
-        const suffixes = ['twitter', 'fb', 'fans', 'tesla_fans', 'spacex', 'official', 'community', 'updates'];
-        const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
-        const username = `${selectedGoatData.username}_${randomSuffix}_${index}`.toLowerCase();
+      const mockSubgroups = SUBGROUP_CATEGORIES.map(category => {
+        const username = `${ownerUsername}_${category.id}`.toLowerCase();
+        const capitalizedName = category.id.charAt(0).toUpperCase() + category.id.slice(1);
         
         return {
           stream_id: null,
           username,
-          verified: Math.random() > 0.5,
+          verified: false,
           metadata_with_translations: {
             bio: {
-              english: `Bulk created ${randomSuffix.replace('_', ' ')} group ${index + 1}`,
+              english: `Official ${capitalizedName} group`,
               hindi: "यादृच्छिक बायो",
               telugu: "యాదృచ్ఛిక జీవితం"
             },
             name: {
-              english: `${username} ${randomSuffix.replace('_', ' ')}`.toUpperCase(),
+              english: capitalizedName,
               hindi: "यादृच्छिक नाम",
               telugu: "యాదృచ్ఛిక పేరు"
             }
           },
           img_url: `https://placehold.co/150?text=${username}`,
           cover_url: `https://placehold.co/600x200?text=${username}`,
-          type: 'TOP',
-          is_premium: Math.random() > 0.7,
-          owner_username: selectedGoatData.username,
+          type: category.id,
+          is_premium: true,
+          is_locked: true,
+          is_public: false,
+          is_realtime: true,
+          is_published: true,
+          is_subgroup: true,
+          owner_username: ownerUsername,
           is_secondary_stream: false,
-          is_party: Math.random() > 0.7,
+          is_party: false,
           is_historical: false,
           is_open: true,
           is_demo: false,
@@ -209,7 +226,7 @@ export function SubgroupsTable() {
       
       const { error } = await createBulkSubgroups(mockSubgroups);
       if (error) throw error;
-      await loadSubgroups(selectedGoat);
+      await loadSubgroups(ownerUsername);
     } catch (err) {
       console.error('Error bulk creating subgroups:', err);
     } finally {
@@ -217,11 +234,11 @@ export function SubgroupsTable() {
     }
   };
 
-  const handleView = (subgroup: ComponentSubgroup) => {
+  const handleView = (subgroup: Subgroup) => {
     console.log('View subgroup:', subgroup);
   };
 
-  const handleEdit = (subgroup: ComponentSubgroup) => {
+  const handleEdit = (subgroup: Subgroup) => {
     console.log('Edit subgroup:', subgroup);
   };
 
@@ -230,7 +247,7 @@ export function SubgroupsTable() {
     try {
       const { error } = await deleteSubgroup(subgroupId);
       if (error) throw error;
-      await loadSubgroups(selectedGoat);
+      await loadSubgroups(ownerUsername);
     } catch (err) {
       console.error('Error deleting subgroup:', err);
     } finally {
@@ -242,15 +259,29 @@ export function SubgroupsTable() {
     }
   };
 
+  const handleClearAll = async () => {
+    if (!ownerUsername) return;
+    setClearing(true);
+    try {
+      const { error } = await clearAllSubgroups(ownerUsername);
+      if (error) throw error;
+      setSubgroups([]); // Clear local state
+    } catch (err) {
+      console.error('Error clearing subgroups:', err);
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">Subgroups</h2>
           <div className="flex gap-2">
             <Button
               onClick={handleAddSubgroup}
-              disabled={creating || !selectedGoat}
+              disabled={creating || !selectedCategory}
+              title={!selectedCategory ? "Please select a category first" : ""}
             >
               {creating ? (
                 <>
@@ -263,53 +294,67 @@ export function SubgroupsTable() {
             </Button>
             <Button
               onClick={handleBulkCreate}
-              disabled={bulkCreating || !selectedGoat}
+              disabled={bulkCreating || !selectedCategory}
               variant="outline"
+              title={!selectedCategory ? "Please select a category first" : ""}
             >
               {bulkCreating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Bulk...
+                  Creating...
                 </>
               ) : (
-                'Create 5 Subgroups'
+                'Create Subgroups'
+              )}
+            </Button>
+            <Button
+              onClick={handleClearAll}
+              disabled={clearing || subgroups.length === 0}
+              variant="destructive"
+            >
+              {clearing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                'Clear All Subgroups'
               )}
             </Button>
           </div>
         </div>
-        <AutoComplete
-          options={goats.map(goat => ({
-            value: goat.uid,
-            label: goat.username,
-            image: goat.img_url
-          }))}
-          value={selectedGoat}
-          onValueChange={setSelectedGoat}
-          placeholder="Select a goat"
-          emptyText="No goats found."
-        />
       </div>
 
-      {selectedGoat && (
-        <SubgroupsList 
-          subgroups={subgroups.map(subgroup => ({
-            ...subgroup,
-            metadata_with_translations: {
-              bio: {
-                english: subgroup.metadata_with_translations.bio.english
-              },
-              name: {
-                english: subgroup.metadata_with_translations.name.english
-              }
+      <SubgroupsList 
+        subgroups={subgroups.map(subgroup => ({
+          subgroup_id: subgroup.subgroup_id,
+          username: subgroup.username,
+          verified: subgroup.verified,
+          metadata_with_translations: {
+            bio: {
+              english: subgroup.metadata_with_translations.bio.english
+            },
+            name: {
+              english: subgroup.metadata_with_translations.name.english
             }
-          }))} 
-          loading={loading}
-          onView={handleView}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          deletingIds={deletingIds}
-        />
-      )}
+          },
+          img_url: subgroup.img_url,
+          cover_url: subgroup.cover_url,
+          type: subgroup.type,
+          is_premium: subgroup.is_premium,
+          is_locked: subgroup.is_locked,
+          is_public: subgroup.is_public,
+          is_realtime: subgroup.is_realtime,
+          is_published: subgroup.is_published,
+          is_subgroup: subgroup.is_subgroup,
+          owner_username: subgroup.owner_username,
+        }))} 
+        loading={loading}
+        onView={handleView}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        deletingIds={deletingIds}
+      />
     </div>
   );
 } 

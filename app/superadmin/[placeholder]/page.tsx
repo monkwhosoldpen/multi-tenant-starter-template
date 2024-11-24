@@ -1,7 +1,5 @@
 "use client";
-import { AdminTabs } from "@/components/goats/AdminTabs";
 import GoatsCrud from "@/components/GoatsCRUD";
-import GoatsList from "@/components/GoatsList";
 import { SuperadminProvider } from "@/lib/usesuperamin";
 
 export default function Page({
@@ -24,7 +22,7 @@ function MyComponent({ placeholder }: { placeholder: string }) {
               <h2 className="text-2xl font-bold tracking-tight">{placeholder}</h2>
             </div>
 
-            <AdminTabs />
+            <GoatsCrud />
 
           </div>
         </div>

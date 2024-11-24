@@ -32,6 +32,7 @@ type SuperAdminContextType = {
   createMessage: (messageData: any) => Promise<{ data: any | null; error: any }>;
   createBulkMessages: (messages: any[]) => Promise<{ data: any | null; error: any }>;
   deleteSubgroup: (subgroupId: number) => Promise<{ data: any | null; error: any }>;
+  clearAllSubgroups: (ownerUsername: string) => Promise<{ data: any | null; error: any }>;
 };
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
@@ -41,11 +42,15 @@ const main_NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9
 const main_NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1cWx2c3prcGJleGJsc2NucGF5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyNTA5MzAwMCwiZXhwIjoyMDQwNjY5MDAwfQ.ckanGyem0hVF9ub9IN3UxnaqgOC2ttFZ5Ifa5WQdh4E';
 const main_NEXT_PUBLIC_SUPABASE_JWT_SECRET = 'LaSV5x4LCxHwKz9UDedXSk+PooG5wxHtecwBIPD/bY8uUjGF9QXIhYiQBKm0qdp/FWcOLesCJZQdLld4em5gPQ==';
 
+type SubgroupData = {
+  owner_username: string;
+  type: string;
+  name?: string;
+  description?: string;
+  username: string;
+};
+
 export function SuperadminProvider({ children }: { children: ReactNode }) {
-  // const supabase = createClient(
-  //   main_NEXT_PUBLIC_SUPABASE_URL,
-  //   main_NEXT_PUBLIC_SUPABASE_ANON_KEY
-  // );
 
   const supabase = createClient(main_NEXT_PUBLIC_SUPABASE_URL, main_NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY);
 
@@ -273,6 +278,14 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const createSubgroup = async (subgroupData: any) => {
+    // Delete existing subgroup with same owner and type
+    await CentralSupabase
+      .from("sub_groups")
+      .delete()
+      .eq('owner_username', subgroupData.owner_username)
+      .eq('type', subgroupData.type);
+
+    // Then insert the new subgroup
     const { data, error } = await CentralSupabase
       .from("sub_groups")
       .insert([subgroupData])
@@ -281,6 +294,16 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const createBulkSubgroups = async (subgroups: any[]) => {
+    // Delete existing subgroups for each owner_username and type combination
+    for (const subgroup of subgroups) {
+      await CentralSupabase
+        .from("sub_groups")
+        .delete()
+        .eq('owner_username', subgroup.owner_username)
+        .eq('type', subgroup.type);
+    }
+
+    // Then insert all new subgroups
     const { data, error } = await CentralSupabase
       .from("sub_groups")
       .insert(subgroups)
@@ -326,6 +349,13 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
     return { data, error };
   };
 
+  const clearAllSubgroups = async (ownerUsername: string) => {
+    return await supabase
+      .from('sub_groups')
+      .delete()
+      .eq('owner_username', ownerUsername);
+  };
+
   return (
     <SuperAdminContext.Provider value={{ 
       supabase, 
@@ -346,6 +376,7 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       createMessage,
       createBulkMessages,
       deleteSubgroup,
+      clearAllSubgroups,
     }}>
       {children}
     </SuperAdminContext.Provider>
