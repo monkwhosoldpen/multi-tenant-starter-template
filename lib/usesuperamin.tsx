@@ -26,13 +26,15 @@ type SuperAdminContextType = {
   generateMockApprovals: () => Promise<{ data: any | null; error: any }>;
   handleApproval: (approvalId: string, status: 'APPROVED' | 'REJECTED') => Promise<{ data: any | null; error: any }>;
   fetchSubgroups: (goatId: string) => Promise<{ data: any[] | null; error: any }>;
-  fetchMessages: (goatId: string, subgroupId: string) => Promise<{ data: any[] | null; error: any }>;
+  fetchMessages: (goatId: string, username: string, table: 'live_messages' | 'messages') => Promise<{ data: any[] | null; error: any }>;
   createSubgroup: (subgroupData: any) => Promise<{ data: any | null; error: any }>;
   createBulkSubgroups: (subgroups: any[]) => Promise<{ data: any | null; error: any }>;
   createMessage: (messageData: any) => Promise<{ data: any | null; error: any }>;
-  createBulkMessages: (messages: any[]) => Promise<{ data: any | null; error: any }>;
+  createBulkMessages: (messages: any[], tableType: 'live_messages' | 'messages') => Promise<{ data: any | null; error: any }>;
   deleteSubgroup: (subgroupId: number) => Promise<{ data: any | null; error: any }>;
   clearAllSubgroups: (ownerUsername: string) => Promise<{ data: any | null; error: any }>;
+  updateSubgroup: (ownerUsername: string, type: string, updates: any) => Promise<{ data: any | null; error: any }>;
+  deleteMessages: (username: string, table: 'live_messages' | 'messages', type: string) => Promise<{ data: any | null; error: any }>;
 };
 
 const SuperAdminContext = createContext<SuperAdminContextType | undefined>(undefined);
@@ -260,19 +262,11 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
     return { data, error };
   };
 
-  const fetchMessages = async (goatId: string, subgroupId: string) => {
+  const fetchMessages = async (goatId: string, username: string, table: 'live_messages' | 'messages',) => {
     const { data, error } = await CentralSupabase
-      .from("sub_group_messages")
-      .select(`
-        id,
-        content,
-        sender_id,
-        created_at,
-        subgroup_id,
-        goat_id
-      `)
-      .eq('goat_id', goatId)
-      .eq('subgroup_id', subgroupId)
+      .from(table)
+      .select('*')
+      .eq('username', username)
       .order('created_at', { ascending: false });
     return { data, error };
   };
@@ -325,18 +319,20 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
     return { data, error };
   };
 
-  const createBulkMessages = async (messages: any[]) => {
-    const formattedMessages = messages.map(msg => ({
-      content: msg.content,
-      sender_id: msg.sender_id,
-      goat_id: msg.goat_id,
-      subgroup_id: msg.subgroup_id,
-      created_at: new Date().toISOString()
-    }));
-
+  const createBulkMessages = async (messages: any[], tableType: 'live_messages' | 'messages') => {
+    const table = tableType;
+    
     const { data, error } = await CentralSupabase
-      .from("sub_group_messages")
-      .insert(formattedMessages)
+      .from(table)
+      .upsert(messages.map(msg => ({
+        room: msg.room,
+        username: msg.username,
+        type: msg.type,
+        view: msg.view,
+        content: msg.content,
+        is_blocked: msg.is_blocked,
+        created_at: msg.created_at
+      })))
       .select();
     return { data, error };
   };
@@ -354,6 +350,24 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       .from('sub_groups')
       .delete()
       .eq('owner_username', ownerUsername);
+  };
+
+  const updateSubgroup = async (ownerUsername: string, type: string, updates: any) => {
+    const { data, error } = await CentralSupabase
+      .from("sub_groups")
+      .update(updates)
+      .eq('owner_username', ownerUsername)
+      .eq('type', type);
+    return { data, error };
+  };
+
+  const deleteMessages = async (username: string, table: 'live_messages' | 'messages', type: string) => {
+    const { data, error } = await CentralSupabase
+      .from(table)
+      .delete()
+      .eq('username', username)
+      .eq('type', type);
+    return { data, error };
   };
 
   return (
@@ -377,6 +391,8 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       createBulkMessages,
       deleteSubgroup,
       clearAllSubgroups,
+      updateSubgroup,
+      deleteMessages,
     }}>
       {children}
     </SuperAdminContext.Provider>

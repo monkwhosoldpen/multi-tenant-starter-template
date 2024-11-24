@@ -100,7 +100,7 @@ export function MessagesTable() {
   const loadMessages = async (goatId: string, subgroupId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await fetchMessages(goatId, subgroupId);
+      const { data, error } = await fetchMessages(goatId, subgroupId, 'live_messages');
       if (error) throw error;
       setMessages(data || []);
     } catch (err) {
@@ -150,7 +150,7 @@ export function MessagesTable() {
         created_at: new Date().toISOString()
       }));
       
-      const { error } = await createBulkMessages(mockMessages);
+      const { error } = await createBulkMessages(mockMessages, 'live_messages');
       if (error) throw error;
       await loadMessages(selectedGoatData.username, selectedSubgroup);
     } catch (err) {

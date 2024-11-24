@@ -6,10 +6,13 @@ import { Loader2, X } from 'lucide-react';
 import { SubgroupsTable } from "./goats/SubgroupsTable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TypesGrid } from "./goats/TypesGrid";
+import { MessagesGrid } from "./goats/MessagesGrid";
+import { GoatDetails } from "./goats/GoatDetails";
 
 // Mock categories for subgroups
 export const SUBGROUP_CATEGORIES = [
   { id: 'official', name: 'Official' },
+  { id: 'public', name: 'Public' },
   { id: 'twitter', name: 'Twitter' },
   { id: 'facebook', name: 'Facebook' },
   { id: 'men', name: 'Men' },
@@ -80,121 +83,49 @@ const GoatsCrud: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-
-            <Select
-              value={selectedCategory}
-              onValueChange={setSelectedCategory}
-            >
-              <SelectTrigger className="w-[280px]">
-                <SelectValue placeholder="Select subgroup category" />
-              </SelectTrigger>
-              <SelectContent>
-                {SUBGROUP_CATEGORIES.map((category) => (
-                  <SelectItem key={category.id} value={category.id}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
         </div>
       </div>
 
       {selectedGoat && (
-        <div className="flex gap-6 min-h-[calc(100vh-200px)]">
-          <div className="w-[70%]">
-            <Tabs defaultValue="subgroups" className="w-full">
-              <TabsList>
-                <TabsTrigger value="subgroups">Subgroups</TabsTrigger>
-                <TabsTrigger value="types">Types</TabsTrigger>
-                <TabsTrigger value="other">Other</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="subgroups">
-                <SubgroupsTable
-                  goatId={selectedGoat.uid}
-                  ownerUsername={selectedGoat.username}
-                  selectedCategory={selectedCategory}
-                />
-              </TabsContent>
-              
-              <TabsContent value="types">
-                <TypesGrid 
-                  categories={SUBGROUP_CATEGORIES} 
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={setSelectedCategory}
-                />
-              </TabsContent>
-              
-              <TabsContent value="other">
-                <div className="p-4 border rounded-lg">
-                  Other content coming soon...
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+        <div className="space-y-6">
+          <Tabs defaultValue="subgroups" className="w-full">
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="subgroups">Subgroups</TabsTrigger>
+              <TabsTrigger value="types">Types</TabsTrigger>
+              <TabsTrigger value="messages">Messages</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="subgroups">
+              <SubgroupsTable
+                goatId={selectedGoat.uid}
+                ownerUsername={selectedGoat.username}
+                selectedCategory={selectedCategory}
+              />
+            </TabsContent>
+            
+            <TabsContent value="types">
+              <TypesGrid 
+                categories={SUBGROUP_CATEGORIES} 
+                selectedCategory={selectedCategory}
+                onSelectCategory={setSelectedCategory}
+                ownerUsername={selectedGoat.username}
+              />
+            </TabsContent>
+            
+            <TabsContent value="messages">
+              <MessagesGrid
+                goatId={selectedGoat.uid}
+                ownerUsername={selectedGoat.username}
+                selectedCategory={selectedCategory}
+              />
+            </TabsContent>
 
-          <div className="w-[30%]">
-            <div className="rounded-md border sticky top-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead colSpan={2} className="text-center">Goat Details</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">Username</TableCell>
-                    <TableCell className="truncate">{selectedGoat.username}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Name</TableCell>
-                    <TableCell className="truncate">{selectedGoat.metadata_with_translations?.name?.english}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Bio</TableCell>
-                    <TableCell className="truncate max-w-[200px]" title={selectedGoat.metadata_with_translations?.bio?.english}>
-                      {selectedGoat.metadata_with_translations?.bio?.english}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Type</TableCell>
-                    <TableCell>{selectedGoat.type}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Verified</TableCell>
-                    <TableCell>{selectedGoat.verified ? 'Yes' : 'No'}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Premium</TableCell>
-                    <TableCell>{selectedGoat.is_premium ? 'Yes' : 'No'}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Country</TableCell>
-                    <TableCell>{selectedGoat.country_code}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Language</TableCell>
-                    <TableCell>{selectedGoat.language_code}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Social Media</TableCell>
-                    <TableCell className="space-y-1">
-                      {selectedGoat.twitter_username && (
-                        <div className="truncate">Twitter: @{selectedGoat.twitter_username}</div>
-                      )}
-                      {selectedGoat.instagram_username && (
-                        <div className="truncate">Instagram: @{selectedGoat.instagram_username}</div>
-                      )}
-                      {selectedGoat.facebook_username && (
-                        <div className="truncate">Facebook: @{selectedGoat.facebook_username}</div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          </div>
+            <TabsContent value="details">
+              <GoatDetails goat={selectedGoat} />
+            </TabsContent>
+          </Tabs>
         </div>
       )}
     </div>

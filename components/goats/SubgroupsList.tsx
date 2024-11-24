@@ -122,6 +122,11 @@ export function SubgroupsList({
                         Published
                       </span>
                     )}
+                    {subgroup.is_realtime && (
+                      <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                        Realtime
+                      </span>
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
