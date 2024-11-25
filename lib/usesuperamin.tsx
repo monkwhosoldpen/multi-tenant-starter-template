@@ -27,7 +27,6 @@ type SuperAdminContextType = {
   generateMockApprovals: () => Promise<{ data: any | null; error: any }>;
   handleApproval: (approvalId: string, status: 'APPROVED' | 'REJECTED') => Promise<{ data: any | null; error: any }>;
   fetchSubgroups: (goatId: string) => Promise<{ data: any[] | null; error: any }>;
-  fetchMessages: (goatId: string, username: string, table: 'live_messages' | 'messages') => Promise<{ data: any[] | null; error: any }>;
   createSubgroup: (subgroupData: Subgroup) => Promise<{ data: any | null; error: any }>;
   createBulkSubgroups: (subgroups: Subgroup[]) => Promise<{ data: any | null; error: any }>;
   createMessage: (messageData: any) => Promise<{ data: any | null; error: any }>;
@@ -256,13 +255,15 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const fetchMessages = async (goatId: string, username: string, table: 'live_messages' | 'messages') => {
-    console.log('useSuperAdmin fetchMessages called with:', { goatId, username, table });
+    console.log('fetchMessages called with:', { goatId, username, table });
+    
     const { data, error } = await CentralSupabase
       .from(table)
       .select('*')
       .eq('username', username)
       .order('created_at', { ascending: true });
-    console.log('fetchMessages response:', { data, error });
+    
+    console.log(`fetchMessages response from ${table}:`, { data, error });
     return { data, error };
   };
 
@@ -301,8 +302,11 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const createMessage = async (messageData: any) => {
+    const table = messageData.tableType; // Use the specified table
+    console.log('Creating message in table:', table);
+    
     const { data, error } = await CentralSupabase
-      .from('live_messages')
+      .from(table)
       .insert([{
         room: messageData.username,
         username: messageData.username,
@@ -317,16 +321,18 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const createBulkMessages = async (messages: Message[], tableType: 'live_messages' | 'messages') => {
-    const table = tableType;
+    console.log('Creating bulk messages in table:', tableType);
     
     const { data, error } = await CentralSupabase
-      .from(table)
+      .from(tableType)
       .insert(messages.map(msg => ({
         username: msg.username,
         content: msg.content,
         created_at: msg.created_at,
       })))
       .select();
+
+    console.log(`Created ${messages.length} messages in ${tableType}:`, { data, error });
     return { data, error };
   };
 
@@ -376,7 +382,6 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       generateMockApprovals,
       handleApproval,
       fetchSubgroups,
-      fetchMessages,
       createSubgroup,
       createBulkSubgroups,
       createMessage,

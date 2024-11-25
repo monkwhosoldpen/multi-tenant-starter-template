@@ -95,7 +95,6 @@ export const generateMockSubgroup = (ownerUsername: string, category: string): S
     const textColor = ownerUsername.includes('Demo') ? 'FFFFFF' : '000000';
 
     return {
-        subgroup_id: Math.floor(Math.random() * 10000),
         username,
         verified: Math.random() > 0.5,
         metadata_with_translations: {
@@ -113,8 +112,8 @@ export const generateMockSubgroup = (ownerUsername: string, category: string): S
         img_url: `https://placehold.co/150/${color}/${textColor}?text=${username}`,
         cover_url: `https://placehold.co/600x200/${color}/${textColor}?text=${username}`,
         category: category,
-        is_premium: category === 'premium',
-        is_locked: category === 'premium',
+        is_premium: true,
+        is_locked: true,
         is_public: false,
         is_realtime: true,
         is_published: true,
@@ -186,32 +185,10 @@ export const generateMockGoat = async (username: string, category: string, supab
         throw goatError;
     }
 
-    // Step 2: Create public subgroup first
-    console.log(`Creating public subgroup for ${username}`);
-    const publicSubgroup = generateMockSubgroup(username, 'public');
-    const { data: publicSubgroupData, error: publicSubgroupError } = await supabase
-        .from("sub_groups")
-        .insert([{
-            ...publicSubgroup,
-            is_published: true,
-            is_realtime: true,
-            is_public: false // Even public group is private but with public name
-        }])
-        .select()
-        .single();
-
-    if (publicSubgroupError) {
-        console.error(`Error creating public subgroup:`, publicSubgroupError);
-        throw publicSubgroupError;
-    }
-
     // Step 3: Create standard subgroups from SUBGROUP_CATEGORIES
-    const createdSubgroups = [publicSubgroupData]; // Include public subgroup in the list
+    const createdSubgroups = []; // Include public subgroup in the list
 
     for (const { id: type } of SUBGROUP_CATEGORIES) {
-        if (type === 'public') continue; // Skip public as it's already created
-
-        console.log(`Creating subgroup ${type} for ${username}`);
         const subgroup = generateMockSubgroup(username, type);
 
         const { data: subgroupData, error: subgroupError } = await supabase
@@ -229,29 +206,6 @@ export const generateMockGoat = async (username: string, category: string, supab
         }
 
         createdSubgroups.push(subgroupData);
-    }
-
-    if (username === 'elonmusk') {
-        // Step 4: Create messages for all successfully created subgroups
-        for (const subgroup of createdSubgroups) {
-            console.log(`Creating messages for ${subgroup.username}`);
-            const subgroupName = subgroup.metadata_with_translations.name.english;
-            const messages = generateMockMessages(10, username, subgroupName);
-
-            const { error: messagesError } = await supabase
-                .from('live_messages')
-                .insert(
-                    messages.map(msg => ({
-                        ...msg,
-                        username: subgroup.username,
-                        created_at: new Date().toISOString()
-                    }))
-                );
-
-            if (messagesError) {
-                console.error(`Error creating messages for ${subgroup.username}:`, messagesError);
-            }
-        }
     }
     return goat;
 };

@@ -1,5 +1,6 @@
 "use client";
 import GoatsCrud from "@/components/GoatsCRUD";
+import { LiveMessagesProvider } from "@/lib/live-messages";
 import { SuperadminProvider } from "@/lib/usesuperamin";
 
 export default function Page({
@@ -15,9 +16,11 @@ export default function Page({
 function MyComponent({ placeholder }: { placeholder: string }) {
   return (
     <SuperadminProvider>
-      <div className="h-[calc(100vh-5rem)] py-20">
-        <GoatsCrud />
-      </div>
+      <LiveMessagesProvider>
+        <div className="h-[calc(100vh-5rem)] py-20">
+          <GoatsCrud />
+        </div>
+      </LiveMessagesProvider>
     </SuperadminProvider>
   );
 }

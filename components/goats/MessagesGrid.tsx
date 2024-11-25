@@ -4,89 +4,41 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send, Plus, Trash2, Loader2 } from "lucide-react";
+import { Send } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Message } from "@/lib/types/goat";
-import useSuperAdmin from "@/lib/usesuperamin";
+import { useLiveMessages } from "@/lib/live-messages";
+import { Message, Subgroup } from "@/lib/types/goat";
 
 interface MessagesGridProps {
   goatId: string;
   ownerUsername: string | undefined;
   selectedCategory: string;
+  subgroup: Subgroup;
 }
 
 export function MessagesGrid({
   goatId,
   ownerUsername,
-  selectedCategory
+  selectedCategory,
+  subgroup
 }: MessagesGridProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  const { fetchMessages, createMessage } = useSuperAdmin();
-
-  // Get the actual username to use (default to public subgroup)
   const actualUsername = ownerUsername?.toLowerCase() || '';
 
-  // Combine the dependencies into a single string to prevent multiple calls
-  const dependencyKey = `${actualUsername}-${goatId}`;
-
-  useEffect(() => {
-    if (actualUsername) {
-      loadMessages();
-    }
-  }, [dependencyKey]); // Only depend on the combined key
-
-  const loadMessages = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await fetchMessages(goatId, actualUsername, 'live_messages');
-      
-      if (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
-      }
-
-      if (Array.isArray(data)) {
-        setMessages(data);
-      } else {
-        setMessages([]);
-      }
-    } catch (err) {
-      console.error('Error in loadMessages:', err);
-      setMessages([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: messages,
+    isLoading: loading,
+    newMessages,
+    messageCounts,
+    error,
+    sendMessage
+  } = useLiveMessages(goatId, subgroup, subgroup.is_realtime);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
     try {
-      console.log('Attempting to send message:', {
-        content: newMessage,
-        goatId,
-        username: actualUsername
-      });
-
-      const messageData = {
-        content: newMessage,
-        goat_id: goatId,
-        username: actualUsername,
-        created_at: new Date().toISOString()
-      };
-
-      console.log('Sending message data:', messageData);
-
-      const { error } = await createMessage(messageData);
-      if (error) {
-        console.error('Error creating message:', error);
-        throw error;
-      }
-
-      console.log('Message sent successfully');
-      await loadMessages();
+      await sendMessage(newMessage);
       setNewMessage('');
     } catch (err) {
       console.error('Error in handleSendMessage:', err);
@@ -103,6 +55,14 @@ export function MessagesGrid({
     return `hsl(${hue}, 70%, 50%)`;
   };
 
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-full text-red-500">
+        Error loading messages
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#313338]">
       {/* Messages Area */}
@@ -110,7 +70,7 @@ export function MessagesGrid({
         {loading ? (
           <div className="flex flex-col items-center justify-center h-full space-y-4 text-gray-400">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
-            <div>Loading messages...</div>
+            <div>Loading messages from {subgroup.is_realtime ? 'live_messages' : 'messages'}...</div>
           </div>
         ) : !messages || messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full space-y-6 text-gray-400 p-4">
@@ -131,14 +91,14 @@ export function MessagesGrid({
               <p className="text-sm text-gray-400 max-w-md">
                 This is the beginning of the {actualUsername} subgroup.
                 <br />
-                Start the conversation by sending a message below.
+                {subgroup.is_realtime ? 'Start a real-time conversation' : 'Add some static messages'} below.
               </p>
             </div>
           </div>
         ) : (
           <div className="space-y-4 p-4">
-            {messages.map((message, index) => {
-              const senderName = `User ${index % 5 + 1}`;
+            {messages.map((message: Message, index: number) => {
+              const senderName = `User ${index + 1}`;
               const senderColor = getSenderColor(senderName);
               
               return (

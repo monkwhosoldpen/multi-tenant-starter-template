@@ -1,22 +1,15 @@
 import { useState, useEffect } from "react";
 import useSuperAdmin from "@/lib/usesuperamin";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Trash2, Plus, ArrowLeft } from 'lucide-react';
-import { SubgroupsTable } from "./goats/SubgroupsTable";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessagesGrid } from "./goats/MessagesGrid";
-import { GoatDetails } from "./goats/GoatDetails";
-import { GoatCategories, GoatCategory, generateMockGoat, generateAllMockData, generateMockSubgroup, generateMockGoatSync } from "@/lib/mockGoatsData";
+import { GoatCategory, generateMockGoat, generateAllMockData, generateMockSubgroup, generateMockGoatSync } from "@/lib/mockGoatsData";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { GoatCard } from "./goats/GoatCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Goat, Subgroup } from "@/lib/types/goat";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { useLiveMessages } from "@/lib/live-messages";
+import { MessagesGrid } from "./goats/MessagesGrid";
 
 // Mock categories for subgroups
 export const SUBGROUP_CATEGORIES = [
@@ -44,7 +37,12 @@ const GoatsCrud: React.FC = () => {
   const [creatingAllGoats, setCreatingAllGoats] = useState(false);
   const [deletingAllGoats, setDeletingAllGoats] = useState(false);
   const [goats, setGoats] = useState<Goat[]>([]);
-  const [isTableView, setIsTableView] = useState(false);
+  const selectedGoat = goats.find(goat => goat.username === selectedGoatId);
+  const { messageCounts } = useLiveMessages(
+    selectedGoat?.username || undefined,
+    undefined,
+    true
+  );
   const [selectedSubgroupId, setSelectedSubgroupId] = useState<string>('');
   const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
@@ -120,14 +118,43 @@ const GoatsCrud: React.FC = () => {
   };
 
   const loadSubgroups = async (username: string) => {
+    const defaultSubgroups: Subgroup[] = [
+      {
+        username: 'public', 
+        verified: false,
+        metadata_with_translations: {
+          name: { english: 'Public' },
+          bio: { english: 'Public' }
+        },
+        img_url: '', cover_url: '',
+        category: 'public',
+        is_premium: false,
+        is_locked: false,
+        is_public: true,
+        is_realtime: false,
+        is_published: true,
+        owner_username: username,
+        is_secondary_stream: false,
+        is_party: false,
+        is_historical: false,
+        is_open: false,
+        is_demo: false,
+        tags: [],
+        entity_type: [],
+        blocked_profile_ids: [],
+        latest_message: null,
+        is_subgroup: true
+      },
+    ];
     try {
       const { data, error } = await fetchSubgroups(username);
       if (error) throw error;
-      setSubgroups(data || []);
+      setSubgroups([...defaultSubgroups, ...(data || [])]);
+
       setSelectedSubgroupId(''); // Reset selected subgroup when goat changes
     } catch (err) {
       console.error('Error loading subgroups:', err);
-      setSubgroups([]);
+      setSubgroups([...defaultSubgroups]);
     }
   };
 
@@ -176,7 +203,7 @@ const GoatsCrud: React.FC = () => {
     try {
       const allData = generateAllMockData();
       const demoGoats = allData['demo'].goats;
-      
+
       for (const goatData of demoGoats) {
         const mockGoat = await generateMockGoat(
           goatData.username,
@@ -186,7 +213,7 @@ const GoatsCrud: React.FC = () => {
         const { error } = await createGoat(mockGoat);
         if (error) throw error;
       }
-      
+
       await loadGoats();
       setSelectedGoatCategory('demo');
       setSelectedGoatId('ElonMusk');
@@ -223,7 +250,6 @@ const GoatsCrud: React.FC = () => {
     ? goats
     : goats.filter(goat => goat.category && goat.category === selectedGoatCategory);
 
-  const selectedGoat = goats.find(goat => goat.username === selectedGoatId);
   const hasGoats = goats.length > 0;
 
   // Get unique, valid categories from goats
@@ -253,17 +279,10 @@ const GoatsCrud: React.FC = () => {
     if (!ownerUsername) return;
     setBulkCreating(true);
     try {
-      // Step 1: Create public subgroup first
-      console.log(`Creating public subgroup for ${ownerUsername}`);
-      const publicSubgroup = generateMockSubgroup(ownerUsername, 'public');
-      const { error: publicError } = await createSubgroup(publicSubgroup);
-      if (publicError) throw publicError;
 
-      // Step 2: Create all standard subgroups
+      // Step 1: Create all standard subgroups
       for (const { id: type } of SUBGROUP_CATEGORIES) {
-        if (type === 'public') continue; // Skip public as it's already created
-        
-        console.log(`Creating subgroup ${type} for ${ownerUsername}`);
+
         const subgroup = generateMockSubgroup(ownerUsername, type);
         const { error } = await createSubgroup(subgroup);
         if (error) {
@@ -285,6 +304,15 @@ const GoatsCrud: React.FC = () => {
     setAddingMessages(true);
     try {
       const subgroupName = selectedSubgroup.metadata_with_translations.name.english;
+      const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
+      
+      console.log('Adding mock messages to:', {
+        username,
+        subgroupName,
+        isRealtime: selectedSubgroup.is_realtime,
+        tableType
+      });
+
       // Create 10 mock messages
       const mockMessages = Array(10).fill(null).map((_, index) => {
         const date = new Date(Date.now() - (10 - index) * 1000 * 60);
@@ -295,9 +323,9 @@ const GoatsCrud: React.FC = () => {
         };
       });
 
-      const { error } = await createBulkMessages(mockMessages, 'live_messages');
+      const { error } = await createBulkMessages(mockMessages, tableType);
       if (error) throw error;
-      
+
       // Force refresh of MessagesGrid
       setMessagesKey(prev => prev + 1);
     } catch (err) {
@@ -308,12 +336,20 @@ const GoatsCrud: React.FC = () => {
   };
 
   const handleClearMessages = async (username: string) => {
-    if (!username) return;
+    if (!username || !selectedSubgroup) return;
     setClearingMessages(true);
     try {
-      const { error } = await deleteMessages(username, 'live_messages', 'DEFAULT');
-      if (error) throw error;
+      const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
       
+      console.log('Clearing messages from:', {
+        username,
+        isRealtime: selectedSubgroup.is_realtime,
+        tableType
+      });
+
+      const { error } = await deleteMessages(username, tableType, 'DEFAULT');
+      if (error) throw error;
+
       // Force refresh of MessagesGrid
       setMessagesKey(prev => prev + 1);
     } catch (err) {
@@ -385,11 +421,10 @@ const GoatsCrud: React.FC = () => {
                 onClick={() => handleGoatCardClick(goat)}
                 className="group relative w-10 h-10 md:w-12 md:h-12"
               >
-                <Avatar className={`w-10 h-10 md:w-12 md:h-12 transition-all duration-200 ${
-                  selectedGoatId === goat.username
-                    ? 'rounded-2xl bg-indigo-500'
-                    : 'rounded-full hover:rounded-2xl'
-                }`}>
+                <Avatar className={`w-10 h-10 md:w-12 md:h-12 transition-all duration-200 ${selectedGoatId === goat.username
+                  ? 'rounded-2xl bg-indigo-500'
+                  : 'rounded-full hover:rounded-2xl'
+                  }`}>
                   <AvatarImage src={goat.img_url} className="object-cover" />
                   <AvatarFallback className="text-xs">{goat.username[0]}</AvatarFallback>
                 </Avatar>
@@ -425,13 +460,12 @@ const GoatsCrud: React.FC = () => {
       {/* Main Content Area */}
       <div className="flex-1 relative">
         {/* Subgroups Area */}
-        <div className={`absolute inset-0 bg-gray-100 transition-all duration-300 ${
-          isMessagesOpen ? 'opacity-0 invisible' : 'opacity-100 visible'
-        }`}>
+        <div className={`absolute inset-0 bg-gray-100 transition-all duration-300 ${isMessagesOpen ? 'opacity-0 invisible' : 'opacity-100 visible'
+          }`}>
           {selectedGoat ? (
-            <>
+            <div className="flex flex-col h-full">
               {/* Subgroups Area Header */}
-              <div className="px-3 md:px-4 py-2 md:py-3 bg-white border-b">
+              <div className="px-3 md:px-4 py-2 md:py-3 bg-white border-b flex-shrink-0">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base md:text-lg font-semibold">
                     {selectedGoat.metadata_with_translations.name.english}
@@ -478,41 +512,52 @@ const GoatsCrud: React.FC = () => {
                 </div>
               </div>
 
-              {/* Subgroups Grid */}
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <div className="flex-1 p-2 md:p-4 overflow-y-auto">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2 md:gap-3">
-                    {subgroups.map((subgroup) => (
-                      <Card
-                        key={subgroup.subgroup_id}
-                        className={`cursor-pointer hover:shadow-md transition-shadow ${
-                          subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
-                        } ${selectedSubgroupDetails?.subgroup_id === subgroup.subgroup_id ? 'ring-2 ring-primary' : ''}`}
-                        onClick={() => {
-                          console.log('Card clicked, setting selectedSubgroup:', subgroup);
-                          setSelectedSubgroupDetails(subgroup);
-                          setSelectedSubgroup(subgroup);
-                          setIsMessagesOpen(true);
-                        }}
-                      >
-                        <CardHeader className="p-2 md:p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 truncate">
+              {/* Subgroups Grid with ScrollArea */}
+              <ScrollArea className="flex-1 p-2 md:p-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2 md:gap-3">
+                  {subgroups.map((subgroup: Subgroup) => (
+                    <Card
+                      key={subgroup.username}
+                      className={`cursor-pointer hover:shadow-md transition-shadow ${subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
+                        } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
+                      onClick={() => {
+                        console.log('Selecting subgroup:', {
+                          subgroup,
+                          isRealtime: subgroup.is_realtime,
+                          username: subgroup.username
+                        });
+                        setSelectedSubgroupDetails(subgroup);
+                        setSelectedSubgroup(subgroup);
+                        setIsMessagesOpen(true);
+                      }}
+                    >
+                      <CardHeader className="p-2 md:p-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 truncate">
+                            <div className="flex items-center gap-2">
                               <h3 className="font-medium text-xs md:text-sm truncate">
                                 {subgroup.metadata_with_translations.name.english}
                               </h3>
+                              {messageCounts[subgroup.username.toLowerCase()] > 0 && (
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 min-w-[20px] px-1 flex items-center justify-center bg-indigo-500 text-white"
+                                >
+                                  {messageCounts[subgroup.username.toLowerCase()]}
+                                </Badge>
+                              )}
                             </div>
-                            <Badge variant="outline" className="text-[10px] md:text-xs">
-                              {subgroup.is_published ? 'Live' : 'Draft'}
-                            </Badge>
                           </div>
-                        </CardHeader>
-                      </Card>
-                    ))}
-                  </div>
+                          <Badge variant="outline" className="text-[10px] md:text-xs">
+                            {subgroup.is_realtime ? 'Realtime' : 'Static'}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                    </Card>
+                  ))}
                 </div>
-              </div>
-            </>
+              </ScrollArea>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center">
               <div className="text-center text-gray-500 p-4">
@@ -524,9 +569,8 @@ const GoatsCrud: React.FC = () => {
         </div>
 
         {/* Messages Area - Discord Style */}
-        <div className={`absolute inset-0 bg-[#313338] transition-transform duration-300 ${
-          isMessagesOpen ? 'translate-x-0' : 'translate-x-[100%]'
-        }`}>
+        <div className={`absolute inset-0 bg-[#313338] transition-transform duration-300 ${isMessagesOpen ? 'translate-x-0' : 'translate-x-[100%]'
+          }`}>
           {/* Header with back button, name, and actions */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#3f4147]">
             <div className="flex items-center gap-2">
@@ -542,7 +586,7 @@ const GoatsCrud: React.FC = () => {
                 {selectedSubgroup?.metadata_with_translations.name.english}
               </h2>
             </div>
-            
+
             {isSuperAdmin && selectedSubgroup && (
               <div className="flex gap-2">
                 <Button
@@ -590,6 +634,7 @@ const GoatsCrud: React.FC = () => {
               goatId={selectedGoat?.username || ''}
               ownerUsername={selectedSubgroup.username}
               selectedCategory={selectedCategory}
+              subgroup={selectedSubgroup}
             />
           )}
         </div>
