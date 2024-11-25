@@ -37,7 +37,7 @@ export function SubgroupsList({
         <div className="text-6xl">📁</div>
         <div className="text-xl font-semibold">No Subgroups Found</div>
         <div className="text-sm text-center max-w-md">
-          This goat doesn't have any subgroups yet.
+          This goat doesnt have any subgroups yet.
           <br />
           Use the buttons above to create subgroups.
         </div>
