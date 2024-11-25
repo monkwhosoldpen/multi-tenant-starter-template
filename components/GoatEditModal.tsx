@@ -279,7 +279,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
                 </Button>
               )}
             </div>
-            <SubgroupsList subgroups={subgroups} />
+            {/* <SubgroupsList subgroups={subgroups} /> */}
           </div>
 
           {mode === 'edit' && (

@@ -138,10 +138,10 @@ export function GoatDetailView({ goats, loading, availableCategories, onEdit }: 
 
           <div className="space-y-2">
             <h3 className="text-lg font-semibold">Subgroups</h3>
-            <SubgroupsList 
+            {/* <SubgroupsList 
               subgroups={subgroups} 
               loading={loadingSubgroups}
-            />
+            /> */}
           </div>
         </div>
       )}
