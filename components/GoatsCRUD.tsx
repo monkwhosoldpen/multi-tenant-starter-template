@@ -89,15 +89,12 @@ const GoatsCrud: React.FC = () => {
 
   // When a goat is selected, close the messages panel
   useEffect(() => {
-    console.log('selectedGoatId changed:', selectedGoatId);
     setIsMessagesOpen(false);
-    console.log('Resetting selectedSubgroup to null');
     setSelectedSubgroup(null);
   }, [selectedGoatId]);
 
   // Add console logs for selectedSubgroup changes
   useEffect(() => {
-    console.log('selectedSubgroup changed:', selectedSubgroup);
   }, [selectedSubgroup]);
 
   const loadGoats = async () => {
@@ -303,14 +300,6 @@ const GoatsCrud: React.FC = () => {
       const subgroupName = selectedSubgroup.metadata_with_translations.name.english;
       const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
       const isPublic = selectedSubgroup.is_public;
-      
-      console.log('Adding mock messages to:', {
-        username,
-        subgroupName,
-        isRealtime: selectedSubgroup.is_realtime,
-        tableType,
-        isPublic
-      });
 
       // Create 10 mock messages
       const mockMessages: Message[] = Array(10).fill(null).map((_, index) => {
@@ -340,13 +329,6 @@ const GoatsCrud: React.FC = () => {
     try {
       const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
       const isPublic = username.toLowerCase() === 'public';
-      
-      console.log('Clearing messages from:', {
-        username,
-        isRealtime: selectedSubgroup.is_realtime,
-        tableType,
-        isPublic
-      });
 
       const { error } = await deleteMessages(selectedSubgroup.owner_username, username, tableType, 'DEFAULT');
       if (error) throw error;
@@ -522,11 +504,6 @@ const GoatsCrud: React.FC = () => {
                       className={`cursor-pointer hover:shadow-md transition-shadow ${subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
                         } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
                       onClick={() => {
-                        console.log('Selecting subgroup:', {
-                          subgroup,
-                          isRealtime: subgroup.is_realtime,
-                          username: subgroup.username
-                        });
                         setSelectedSubgroupDetails(subgroup);
                         setSelectedSubgroup(subgroup);
                         setIsMessagesOpen(true);

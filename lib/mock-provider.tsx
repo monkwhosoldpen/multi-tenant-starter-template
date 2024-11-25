@@ -70,7 +70,19 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
   };
 
   const clearAllGoats = async () => {
-    return await supabase.from("user_profiles").delete().neq('uid', '');
+    try {
+      // Delete all records without using UUID comparison
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .delete()
+        .not('uid', 'is', null); // Delete all records where uid is not null
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error in clearAllGoats:', error);
+      return { data: null, error };
+    }
   };
 
   const mockMultipleGoats = async (goatsData: any[]) => {

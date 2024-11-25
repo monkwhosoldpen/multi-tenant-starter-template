@@ -170,7 +170,6 @@ export const generateMockGoatSync = (username: string, category: string): Goat =
 export const generateMockGoat = async (username: string, category: string, supabase: any): Promise<Goat> => {
     // Step 1: Create the goat
     const goat = generateMockGoatSync(username, category);
-    console.log('Creating goat:', username);
 
     const { data: goatData, error: goatError } = await supabase
         .from("user_profiles")

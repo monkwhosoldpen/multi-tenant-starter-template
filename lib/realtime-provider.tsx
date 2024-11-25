@@ -90,7 +90,6 @@ export const useRealtimeMessages = (
             filter: `username=eq.${subgroup.username}`
           },
           (payload: any) => {
-            console.log('Real-time message received:', payload);
             const formattedMessage = formatMessage(payload.new, DEFAULT_USER_PROFILE);
             setMessages(prev => [...prev, formattedMessage]);
             setNewMessages(prev => [...prev, formattedMessage]);
@@ -143,7 +142,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
     }
     
     const normalizedUsername = username.toLowerCase();
-    console.log(`Updating count for ${normalizedUsername}`);
     
     setSubgroupMessageCounts(prev => {
       // Check if count is already updated to prevent duplicates
@@ -152,7 +150,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
       
       // Only update if the count has changed
       if (currentCount === prev[normalizedUsername]) {
-        console.log(`${normalizedUsername}: ${currentCount} -> ${newCount}`);
         return {
           ...prev,
           [normalizedUsername]: newCount
@@ -167,7 +164,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
     let messageIds = new Set(); // Track processed message IDs
 
     const fetchMessages = async () => {
-      console.log('Fetching initial messages...');
       try {
         const { data, error } = await CentralSupabase
           .from("live_messages")
@@ -177,8 +173,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
         if (error) throw error;
         if (!isSubscribed) return;
 
-        console.log('Initial messages fetched:', data?.length || 0, 'messages');
-        
         // Calculate initial counts
         const counts: Record<string, number> = {};
         data?.forEach((msg: { username?: string; message_id?: number }) => {
@@ -189,7 +183,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
           }
         });
 
-        console.log('Initial counts calculated:', counts);
         setSubgroupMessageCounts(counts);
         
         const formattedMessages: Message[] = data?.map((msg: Message) => formatMessage(msg, DEFAULT_USER_PROFILE)) || [];
@@ -221,12 +214,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
           if (!messageId || messageIds.has(messageId)) {
             return;
           }
-          
-          console.log('Real-time update received:', {
-            username: newMessage?.username,
-            messageId: messageId,
-            timestamp: payload.commit_timestamp
-          });
 
           messageIds.add(messageId);
 
@@ -248,7 +235,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
       });
 
     return () => {
-      console.log('Cleaning up subscription...');
       isSubscribed = false;
       messageIds.clear();
       CentralSupabase.removeChannel(channel);
@@ -257,7 +243,6 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
 
   // Debug logging for message count updates
   useEffect(() => {
-    console.log('Message counts updated:', subgroupMessageCounts);
   }, [subgroupMessageCounts]);
 
   const contextValue = {
