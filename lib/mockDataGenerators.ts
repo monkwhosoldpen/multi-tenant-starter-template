@@ -19,8 +19,8 @@ const generateRandomBio = () => {
 
 export const generateMockGoat = (category: string, index: number) => {
   const randomName = generateRandomName();
-  const timestamp = Date.now();
-  const username = `${randomName.toLowerCase().replace(' ', '_')}_${timestamp}_${index}`;
+  const created_at = Date.now();
+  const username = `${randomName.toLowerCase().replace(' ', '_')}_${created_at}_${index}`;
   
   return {
     profile_id: Math.floor(Math.random() * 1000000) + index,

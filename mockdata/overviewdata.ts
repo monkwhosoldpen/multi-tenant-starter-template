@@ -129,7 +129,7 @@ export const overviewMockData = {
     {
       type: "field_operation",
       description: "Door-to-door campaign in Secunderabad",
-      timestamp: "2024-03-15T14:30:00Z",
+      created_at: "2024-03-15T14:30:00Z",
       metrics: {
         households: 1500,
         registrations: 250,
@@ -139,7 +139,7 @@ export const overviewMockData = {
     {
       type: "event",
       description: "Town Hall Meeting at Community Center",
-      timestamp: "2024-03-15T16:00:00Z",
+      created_at: "2024-03-15T16:00:00Z",
       metrics: {
         attendance: 500,
         questions: 25,
@@ -152,13 +152,13 @@ export const overviewMockData = {
     {
       type: "critical",
       message: "Low volunteer turnout in Kapra district",
-      timestamp: "2024-03-15T10:00:00Z",
+      created_at: "2024-03-15T10:00:00Z",
       status: "unresolved",
     },
     {
       type: "warning",
       message: "Weather alert for tomorrow's outdoor event",
-      timestamp: "2024-03-15T11:30:00Z",
+      created_at: "2024-03-15T11:30:00Z",
       status: "monitoring",
     },
     // ... more alerts

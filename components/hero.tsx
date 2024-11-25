@@ -39,8 +39,6 @@ export function Hero(props: {
 
           <Link
             href={props.secondaryCtaLink}
-            target="_blank"
-            rel="noreferrer"
             className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
           >
             {props.secondaryCtaText}

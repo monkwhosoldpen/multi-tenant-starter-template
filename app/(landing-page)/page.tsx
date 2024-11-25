@@ -31,8 +31,8 @@ export default async function IndexPage() {
         subtitle="Built for developers, by developers. Next.js + Shadcn UI + Stack Auth."
         primaryCtaText="Get Started"
         primaryCtaLink={stackServerApp.urls.signUp}
-        secondaryCtaText="GitHub"
-        secondaryCtaLink="https://github.com/stack-auth/stack-template"
+        secondaryCtaText="Start"
+        secondaryCtaLink="/superadmin/discord"
         credits={
           <>
             Crafted with ❤️ by{" "}

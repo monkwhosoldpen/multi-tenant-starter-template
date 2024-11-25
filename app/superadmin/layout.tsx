@@ -12,13 +12,6 @@ export default function Layout(props: { children: React.ReactNode }) {
         ]}
       />
       <main className="flex-1">{props.children}</main>
-      <Footer
-        builtBy="Stack Auth"
-        builtByLink="https://stack-auth.com/"
-        githubLink="https://github.com/stack-auth/stack-template"
-        twitterLink="https://twitter.com/stack_auth"
-        linkedinLink="linkedin.com/company/stack-auth"
-      />
     </div>
   );
 }

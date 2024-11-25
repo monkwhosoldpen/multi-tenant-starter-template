@@ -14,19 +14,10 @@ export default function Page({
 
 function MyComponent({ placeholder }: { placeholder: string }) {
   return (
-    <>
-      <SuperadminProvider>
-        <div className="flex-col">
-          <div className="flex-1 space-y-4 p-8 pt-6">
-            <div className="flex items-center justify-between space-y-2">
-              <h2 className="text-2xl font-bold tracking-tight">{placeholder}</h2>
-            </div>
-
-            <GoatsCrud />
-
-          </div>
-        </div>
-      </SuperadminProvider>
-    </>
+    <SuperadminProvider>
+      <div className="h-[calc(100vh-5rem)] py-20">
+        <GoatsCrud />
+      </div>
+    </SuperadminProvider>
   );
 }

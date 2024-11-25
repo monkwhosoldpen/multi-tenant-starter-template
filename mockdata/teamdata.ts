@@ -16,7 +16,7 @@ export const teamMockData = {
         recentActivity: {
           type: "event",
           description: "Coordinated youth voter registration drive",
-          timestamp: "2024-03-15T14:30:00Z",
+          created_at: "2024-03-15T14:30:00Z",
           impact: "registered 85 new voters",
         },
       },

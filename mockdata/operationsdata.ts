@@ -36,14 +36,14 @@ export const operationsMockData = {
     {
       team: "Team Alpha",
       activity: "Door-to-door campaign in District 5",
-      timestamp: "2 hours ago",
+      created_at: "2 hours ago",
       status: "completed",
       impact: "150 households reached",
     },
     {
       team: "Team Beta",
       activity: "Voter registration drive at Community Center",
-      timestamp: "4 hours ago",
+      created_at: "4 hours ago",
       status: "in-progress",
       impact: "85 new registrations",
     },

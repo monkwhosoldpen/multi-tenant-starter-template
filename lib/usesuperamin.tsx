@@ -2,6 +2,7 @@
 
 import { createContext, useContext, ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { Message, Subgroup } from './types/goat';
 
 type SuperAdminContextType = {
   supabase: any;
@@ -27,10 +28,10 @@ type SuperAdminContextType = {
   handleApproval: (approvalId: string, status: 'APPROVED' | 'REJECTED') => Promise<{ data: any | null; error: any }>;
   fetchSubgroups: (goatId: string) => Promise<{ data: any[] | null; error: any }>;
   fetchMessages: (goatId: string, username: string, table: 'live_messages' | 'messages') => Promise<{ data: any[] | null; error: any }>;
-  createSubgroup: (subgroupData: any) => Promise<{ data: any | null; error: any }>;
-  createBulkSubgroups: (subgroups: any[]) => Promise<{ data: any | null; error: any }>;
+  createSubgroup: (subgroupData: Subgroup) => Promise<{ data: any | null; error: any }>;
+  createBulkSubgroups: (subgroups: Subgroup[]) => Promise<{ data: any | null; error: any }>;
   createMessage: (messageData: any) => Promise<{ data: any | null; error: any }>;
-  createBulkMessages: (messages: any[], tableType: 'live_messages' | 'messages') => Promise<{ data: any | null; error: any }>;
+  createBulkMessages: (messages: Message[], tableType: 'live_messages' | 'messages') => Promise<{ data: any | null; error: any }>;
   deleteSubgroup: (subgroupId: number) => Promise<{ data: any | null; error: any }>;
   clearAllSubgroups: (ownerUsername: string) => Promise<{ data: any | null; error: any }>;
   updateSubgroup: (ownerUsername: string, type: string, updates: any) => Promise<{ data: any | null; error: any }>;
@@ -43,14 +44,6 @@ const main_NEXT_PUBLIC_SUPABASE_URL = "https://iuqlvszkpbexblscnpay.supabase.co"
 const main_NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1cWx2c3prcGJleGJsc2NucGF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjUwOTMwMDAsImV4cCI6MjA0MDY2OTAwMH0.VlQG9CG1s4m9ZLFcFH_W6E2VpWNHtVftKdvRGIWZz6Y";
 const main_NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml1cWx2c3prcGJleGJsc2NucGF5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTcyNTA5MzAwMCwiZXhwIjoyMDQwNjY5MDAwfQ.ckanGyem0hVF9ub9IN3UxnaqgOC2ttFZ5Ifa5WQdh4E';
 const main_NEXT_PUBLIC_SUPABASE_JWT_SECRET = 'LaSV5x4LCxHwKz9UDedXSk+PooG5wxHtecwBIPD/bY8uUjGF9QXIhYiQBKm0qdp/FWcOLesCJZQdLld4em5gPQ==';
-
-type SubgroupData = {
-  owner_username: string;
-  type: string;
-  name?: string;
-  description?: string;
-  username: string;
-};
 
 export function SuperadminProvider({ children }: { children: ReactNode }) {
 
@@ -262,12 +255,14 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
     return { data, error };
   };
 
-  const fetchMessages = async (goatId: string, username: string, table: 'live_messages' | 'messages',) => {
+  const fetchMessages = async (goatId: string, username: string, table: 'live_messages' | 'messages') => {
+    console.log('useSuperAdmin fetchMessages called with:', { goatId, username, table });
     const { data, error } = await CentralSupabase
       .from(table)
       .select('*')
       .eq('username', username)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: true });
+    console.log('fetchMessages response:', { data, error });
     return { data, error };
   };
 
@@ -277,7 +272,7 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       .from("sub_groups")
       .delete()
       .eq('owner_username', subgroupData.owner_username)
-      .eq('type', subgroupData.type);
+      .eq('category', subgroupData.type);
 
     // Then insert the new subgroup
     const { data, error } = await CentralSupabase
@@ -307,31 +302,29 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
 
   const createMessage = async (messageData: any) => {
     const { data, error } = await CentralSupabase
-      .from("sub_group_messages")
+      .from('live_messages')
       .insert([{
+        room: messageData.username,
+        username: messageData.username,
         content: messageData.content,
-        sender_id: messageData.sender_id,
-        goat_id: messageData.goat_id,
-        subgroup_id: messageData.subgroup_id,
-        created_at: new Date().toISOString()
+        created_at: messageData.created_at,
+        type: 'DEFAULT',
+        view: 'DEFAULT',
+        is_blocked: false
       }])
       .select();
     return { data, error };
   };
 
-  const createBulkMessages = async (messages: any[], tableType: 'live_messages' | 'messages') => {
+  const createBulkMessages = async (messages: Message[], tableType: 'live_messages' | 'messages') => {
     const table = tableType;
     
     const { data, error } = await CentralSupabase
       .from(table)
-      .upsert(messages.map(msg => ({
-        room: msg.room,
+      .insert(messages.map(msg => ({
         username: msg.username,
-        type: msg.type,
-        view: msg.view,
         content: msg.content,
-        is_blocked: msg.is_blocked,
-        created_at: msg.created_at
+        created_at: msg.created_at,
       })))
       .select();
     return { data, error };
@@ -366,7 +359,6 @@ export function SuperadminProvider({ children }: { children: ReactNode }) {
       .from(table)
       .delete()
       .eq('username', username)
-      .eq('type', type);
     return { data, error };
   };
 

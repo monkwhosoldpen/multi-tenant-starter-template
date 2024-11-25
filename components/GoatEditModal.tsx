@@ -45,13 +45,13 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
   useEffect(() => {
     const fetchSubgroups = async () => {
       if (!goat?.username) return;
-      
+
       try {
         const { data, error } = await supabase
           .from('sub_groups')
           .select('*')
           .eq('owner_username', goat.username);
-          
+
         if (error) throw error;
         setSubgroups(data || []);
       } catch (error) {
@@ -89,7 +89,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (mode === 'view') return;
-    
+
     setLoading(true);
     try {
       await onSave({
@@ -108,7 +108,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
     const suffixes = ['twitter', 'fb', 'fans', 'tesla_fans', 'spacex', 'official', 'community', 'updates'];
     const randomSuffix = suffixes[Math.floor(Math.random() * suffixes.length)];
     const username = `${ownerUsername}_${randomSuffix}`.toLowerCase();
-    
+
     return {
       subgroup_id: Math.floor(Math.random() * 1000000),
       stream_id: null,
@@ -140,18 +140,18 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
       const { error } = await supabase
         .from('sub_groups')
         .insert([mockSubgroup]);
-        
+
       if (error) throw error;
-      
+
       // Refresh subgroups list
       const { data, error: fetchError } = await supabase
         .from('sub_groups')
         .select('*')
         .eq('owner_username', goat.username);
-        
+
       if (fetchError) throw fetchError;
       setSubgroups(data || []);
-      
+
     } catch (error) {
       console.error('Error adding mock subgroup:', error);
     }
@@ -160,9 +160,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95%] max-w-[80%] md:w-full sm:max-w-[95%] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{mode === 'edit' ? 'Edit Goat' : 'View Goat'}</DialogTitle>
-        </DialogHeader>
+        <DialogTitle>{mode === 'edit' ? 'Edit Goat' : 'View Goat'}</DialogTitle>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Username</label>
@@ -172,7 +170,7 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
               disabled={mode === 'view'}
             />
           </div>
-          
+
           <div className="space-y-2">
             <label className="text-sm font-medium">Twitter Username</label>
             <Input
@@ -210,9 +208,9 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
                 className="flex-1"
               />
               {formData.img_url && (
-                <img 
-                  src={formData.img_url} 
-                  alt="Profile Preview" 
+                <img
+                  src={formData.img_url}
+                  alt="Profile Preview"
                   className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
@@ -233,9 +231,9 @@ export function GoatEditModal({ isOpen, onClose, goat, onSave, mode }: GoatEditM
                 className="flex-1"
               />
               {formData.cover_url && (
-                <img 
-                  src={formData.cover_url} 
-                  alt="Cover Preview" 
+                <img
+                  src={formData.cover_url}
+                  alt="Cover Preview"
                   className="w-16 h-10 object-cover rounded-md flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;

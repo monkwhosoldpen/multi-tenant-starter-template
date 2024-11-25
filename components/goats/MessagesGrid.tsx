@@ -1,341 +1,193 @@
 'use client';
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import useSuperAdmin from "@/lib/usesuperamin";
+import { Send, Plus, Trash2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { SUBGROUP_CATEGORIES } from "../GoatsCRUD";
-
-interface Message {
-  id: number;
-  created_at: string;
-  room: number;
-  username: string;
-  type: string;
-  view: boolean;
-  content: string;
-  is_blocked: boolean;
-}
+import { Message } from "@/lib/types/goat";
+import useSuperAdmin from "@/lib/usesuperamin";
 
 interface MessagesGridProps {
   goatId: string;
-  ownerUsername: string;
+  ownerUsername: string | undefined;
   selectedCategory: string;
 }
 
-export function MessagesGrid({ goatId, ownerUsername, selectedCategory }: MessagesGridProps) {
-  const [loading, setLoading] = useState(false);
+export function MessagesGrid({
+  goatId,
+  ownerUsername,
+  selectedCategory
+}: MessagesGridProps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [selectedType, setSelectedType] = useState('public');
-  const [existingSubgroups, setExistingSubgroups] = useState<Set<string>>(new Set());
-  const { createBulkMessages, fetchMessages, fetchSubgroups, deleteMessages } = useSuperAdmin();
+  const [loading, setLoading] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const { fetchMessages, createMessage } = useSuperAdmin();
+
+  // Get the actual username to use (default to public subgroup)
+  const actualUsername = ownerUsername?.toLowerCase() || '';
+
+  // Combine the dependencies into a single string to prevent multiple calls
+  const dependencyKey = `${actualUsername}-${goatId}`;
 
   useEffect(() => {
-    const loadExistingSubgroups = async () => {
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      if (subgroups) {
-        const existingTypes = new Set(subgroups.map(sg => sg.type));
-        setExistingSubgroups(existingTypes);
-        
-        if (!existingTypes.has('public') && existingTypes.size > 0) {
-          setSelectedType(subgroups[0].type);
-        }
-      }
-    };
+    if (actualUsername) {
+      loadMessages();
+    }
+  }, [dependencyKey]); // Only depend on the combined key
 
-    loadExistingSubgroups();
-  }, [ownerUsername]);
-
-  const loadMessages = async (type: string) => {
+  const loadMessages = async () => {
+    setLoading(true);
     try {
-      // First fetch the subgroup to check is_realtime
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      const subgroup = subgroups?.find(sg => sg.type === type);
+      const { data, error } = await fetchMessages(goatId, actualUsername, 'live_messages');
       
-      if (subgroup) {
-        const subgroupUsername = `${ownerUsername}_${type}`.toLowerCase();
-        // Choose table based on is_realtime status
-        const table = subgroup.is_realtime ? 'live_messages' : 'messages';
-        
-        // Pass parameters in the correct order: goatId, table, username, type
-        const { data } = await fetchMessages(
-          goatId,        // goatId parameter
-          subgroupUsername, // username parameter
-          table,         // table parameter ('live_messages' or 'messages')
-        );
-        
-        setMessages(data || []);
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+
+      if (Array.isArray(data)) {
+        setMessages(data);
       } else {
         setMessages([]);
       }
     } catch (err) {
-      console.error('Error loading messages:', err);
+      console.error('Error in loadMessages:', err);
       setMessages([]);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedType) {
-      loadMessages(selectedType);
-    }
-  }, [selectedType, goatId]);
-
-  const handleMockMessages = async () => {
-    if (!selectedType) return;
-    
-    setLoading(true);
-    try {
-      // First fetch the subgroup to check is_realtime
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      const subgroup = subgroups?.find(sg => sg.type === selectedType);
-      
-      if (subgroup) {
-        // Use subgroup's username instead of owner's username
-        const subgroupUsername = `${ownerUsername}_${selectedType}`.toLowerCase();
-        
-        // Create exactly 5 messages
-        const mockMessages = Array(5).fill(null).map((_, i) => ({
-          room: parseInt(goatId, 10),
-          username: subgroupUsername,
-          type: selectedType,
-          view: true,
-          content: `Mock message ${i + 1} for ${selectedType} subgroup`,
-          is_blocked: false,
-          created_at: new Date().toISOString()
-        }));
-
-        // Choose table based on subgroup's is_realtime status
-        const tableType = subgroup.is_realtime ? 'live_messages' : 'messages';
-        await createBulkMessages(mockMessages, tableType);
-        
-        // Reload messages after creating new ones
-        await loadMessages(selectedType);
-      }
-    } catch (err) {
-      console.error('Error creating mock messages:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMockAllSubgroups = async () => {
-    setLoading(true);
-    try {
-      // Fetch all existing subgroups
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      
-      if (subgroups && subgroups.length > 0) {
-        for (const subgroup of subgroups) {
-          const subgroupUsername = `${ownerUsername}_${subgroup.type}`.toLowerCase();
-          
-          // Create 5 messages for each subgroup
-          const mockMessages = Array(5).fill(null).map((_, i) => ({
-            room: parseInt(goatId, 10),
-            username: subgroupUsername,
-            type: subgroup.type,
-            view: true,
-            content: `Mock message ${i + 1} for ${subgroup.type} subgroup`,
-            is_blocked: false,
-            created_at: new Date().toISOString()
-          }));
+  const handleSendMessage = async () => {
+    if (!newMessage.trim()) return;
 
-          // Choose table based on subgroup's is_realtime status
-          const tableType = subgroup.is_realtime ? 'live_messages' : 'messages';
-          await createBulkMessages(mockMessages, tableType);
-        }
-        
-        // Reload messages for currently selected type
-        await loadMessages(selectedType);
+    try {
+      console.log('Attempting to send message:', {
+        content: newMessage,
+        goatId,
+        username: actualUsername
+      });
+
+      const messageData = {
+        content: newMessage,
+        goat_id: goatId,
+        username: actualUsername,
+        created_at: new Date().toISOString()
+      };
+
+      console.log('Sending message data:', messageData);
+
+      const { error } = await createMessage(messageData);
+      if (error) {
+        console.error('Error creating message:', error);
+        throw error;
       }
+
+      console.log('Message sent successfully');
+      await loadMessages();
+      setNewMessage('');
     } catch (err) {
-      console.error('Error creating mock messages for all subgroups:', err);
-    } finally {
-      setLoading(false);
+      console.error('Error in handleSendMessage:', err);
     }
   };
 
-  const handleDeleteMessages = async () => {
-    if (!selectedType) return;
-    
-    setLoading(true);
-    try {
-      // First fetch the subgroup to check is_realtime
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      const subgroup = subgroups?.find(sg => sg.type === selectedType);
-      
-      if (subgroup) {
-        const subgroupUsername = `${ownerUsername}_${selectedType}`.toLowerCase();
-        const table = subgroup.is_realtime ? 'live_messages' : 'messages';
-        
-        // Delete messages for this subgroup
-        await deleteMessages(subgroupUsername, table, selectedType);
-        
-        // Reload messages to show empty state
-        setMessages([]);
-      }
-    } catch (err) {
-      console.error('Error deleting messages:', err);
-    } finally {
-      setLoading(false);
+  // Generate a random color for each sender
+  const getSenderColor = (sender: string) => {
+    let hash = 0;
+    for (let i = 0; i < sender.length; i++) {
+      hash = sender.charCodeAt(i) + ((hash << 5) - hash);
     }
-  };
-
-  const handleDeleteAllMessages = async () => {
-    setLoading(true);
-    try {
-      // Fetch all subgroups
-      const { data: subgroups } = await fetchSubgroups(ownerUsername);
-      
-      if (subgroups && subgroups.length > 0) {
-        for (const subgroup of subgroups) {
-          const subgroupUsername = `${ownerUsername}_${subgroup.type}`.toLowerCase();
-          const table = subgroup.is_realtime ? 'live_messages' : 'messages';
-          
-          // Delete messages for each subgroup
-          await deleteMessages(subgroupUsername, table, subgroup.type);
-        }
-        
-        // Clear current messages display
-        setMessages([]);
-      }
-    } catch (err) {
-      console.error('Error deleting all messages:', err);
-    } finally {
-      setLoading(false);
-    }
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 50%)`;
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Select
-            value={selectedType}
-            onValueChange={setSelectedType}
-          >
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Select subgroup type" />
-            </SelectTrigger>
-            <SelectContent>
-              {SUBGROUP_CATEGORIES.map((category) => (
-                <SelectItem 
-                  key={category.id} 
-                  value={category.id}
-                  disabled={!existingSubgroups.has(category.id)}
-                  className={!existingSubgroups.has(category.id) ? 'opacity-50' : ''}
-                >
-                  {category.name}
-                  {!existingSubgroups.has(category.id) && ' (Not Created)'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleMockMessages} 
-              disabled={loading || !selectedType}
-              size="sm"
-              className="h-8 px-3"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                'Mock Messages'
-              )}
-            </Button>
-
-            <Button 
-              onClick={handleDeleteMessages}
-              disabled={loading || !selectedType}
-              variant="destructive"
-              size="sm"
-              className="h-8 px-3"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete Messages'
-              )}
-            </Button>
+    <div className="flex flex-col h-full bg-[#313338]">
+      {/* Messages Area */}
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center h-full space-y-4 text-gray-400">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400"></div>
+            <div>Loading messages...</div>
           </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button 
-            onClick={handleMockAllSubgroups} 
-            disabled={loading || existingSubgroups.size === 0}
-            variant="outline"
-            size="sm"
-            className="h-8 px-3"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                Creating All...
-              </>
-            ) : (
-              'Mock All Subgroups'
-            )}
-          </Button>
-
-          <Button 
-            onClick={handleDeleteAllMessages}
-            disabled={loading || existingSubgroups.size === 0}
-            variant="destructive"
-            size="sm"
-            className="h-8 px-3 bg-red-700"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                Deleting All...
-              </>
-            ) : (
-              'Delete All Messages'
-            )}
-          </Button>
-        </div>
+        ) : !messages || messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full space-y-6 text-gray-400 p-4">
+            <div className="w-72 h-72 relative">
+              <img 
+                src="https://placehold.co/300x300?text=💬" 
+                alt="No messages"
+                className="w-full h-full object-contain opacity-50"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://placehold.co/300x300?text=💬';
+                }}
+              />
+            </div>
+            <div className="text-center space-y-2">
+              <h3 className="text-xl font-semibold text-gray-300">
+                Welcome to #{actualUsername}!
+              </h3>
+              <p className="text-sm text-gray-400 max-w-md">
+                This is the beginning of the {actualUsername} subgroup.
+                <br />
+                Start the conversation by sending a message below.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 p-4">
+            {messages.map((message, index) => {
+              const senderName = `User ${index % 5 + 1}`;
+              const senderColor = getSenderColor(senderName);
+              
+              return (
+                <div key={index} className="flex items-start gap-3 group hover:bg-[#2e3035] p-2 rounded">
+                  <Avatar className="h-10 w-10 rounded-full">
+                    <AvatarImage src={`https://placehold.co/100/${senderColor.replace('#', '')}?text=${senderName[0]}`} />
+                    <AvatarFallback style={{ backgroundColor: senderColor }}>
+                      {senderName[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-100" style={{ color: senderColor }}>
+                        {senderName}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {new Date(message.created_at).toLocaleString()}
+                      </span>
+                    </div>
+                    <p className="text-gray-300 break-words">{message.content}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="border rounded-lg p-4">
-        <h3 className="font-medium mb-2">Messages</h3>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Content</TableHead>
-              <TableHead>Username</TableHead>
-              <TableHead>Created At</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {messages.map((message) => (
-              <TableRow key={message.id}>
-                <TableCell>{message.content}</TableCell>
-                <TableCell>{message.username}</TableCell>
-                <TableCell>{new Date(message.created_at).toLocaleString()}</TableCell>
-                <TableCell>
-                  {message.is_blocked ? (
-                    <span className="text-red-500">Blocked</span>
-                  ) : message.view ? (
-                    <span className="text-green-500">Visible</span>
-                  ) : (
-                    <span className="text-gray-500">Hidden</span>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      {/* Message Input */}
+      <div className="p-4 bg-[#313338] border-t border-[#3f4147]">
+        <div className="flex gap-2">
+          <Input
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            placeholder={messages.length === 0 ? 
+              `Welcome to #${actualUsername}! Send your first message...` : 
+              `Message #${actualUsername}`
+            }
+            className="bg-[#383a40] border-none text-gray-100 placeholder-gray-400 focus-visible:ring-1 focus-visible:ring-[#5865f2]"
+          />
+          <Button
+            onClick={handleSendMessage}
+            size="icon"
+            className="bg-[#5865f2] hover:bg-[#4752c4] text-white"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );
