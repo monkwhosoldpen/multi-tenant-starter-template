@@ -7,8 +7,9 @@ import { Goat, Subgroup, Message } from "@/lib/types/goat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import useSuperAdmin, { useLiveMessages } from "@/lib/live-messages";
+import useSuperAdmin from "@/lib/mock-provider";
 import { MessagesGrid } from "./goats/MessagesGrid";
+import { useRealtimeMessagesContext } from "@/lib/realtime-provider";
 
 // Mock categories for subgroups
 export const SUBGROUP_CATEGORIES = [
@@ -37,11 +38,7 @@ const GoatsCrud: React.FC = () => {
   const [deletingAllGoats, setDeletingAllGoats] = useState(false);
   const [goats, setGoats] = useState<Goat[]>([]);
   const selectedGoat = goats.find(goat => goat.username === selectedGoatId);
-  const { messageCounts } = useLiveMessages(
-    selectedGoat?.username || undefined,
-    undefined,
-    true
-  );
+  const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
   const [selectedSubgroupId, setSelectedSubgroupId] = useState<string>('');
   const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
@@ -54,6 +51,7 @@ const GoatsCrud: React.FC = () => {
   const [clearingMessages, setClearingMessages] = useState(false);
   const [messagesKey, setMessagesKey] = useState(0);
   const [creatingDemoGoats, setCreatingDemoGoats] = useState(false);
+  const { subgroupMessageCounts } = useRealtimeMessagesContext();
 
   const {
     fetchGoats,
@@ -541,14 +539,16 @@ const GoatsCrud: React.FC = () => {
                               <h3 className="font-medium text-xs md:text-sm truncate">
                                 {subgroup.metadata_with_translations.name.english}
                               </h3>
-                              {messageCounts[subgroup.username.toLowerCase()] > 0 && (
-                                <Badge
-                                  variant="secondary"
-                                  className="h-5 min-w-[20px] px-1 flex items-center justify-center bg-indigo-500 text-white"
-                                >
-                                  {messageCounts[subgroup.username.toLowerCase()]}
-                                </Badge>
-                              )}
+                              <Badge
+                                variant="secondary"
+                                className={`h-5 min-w-[20px] px-1 flex items-center justify-center ${
+                                  subgroupMessageCounts[subgroup.username] > 0 
+                                    ? 'bg-indigo-500 text-white' 
+                                    : 'bg-gray-200 text-gray-500'
+                                }`}
+                              >
+                                {subgroupMessageCounts[subgroup.username] || 0}
+                              </Badge>
                             </div>
                           </div>
                           <Badge variant="outline" className="text-[10px] md:text-xs">

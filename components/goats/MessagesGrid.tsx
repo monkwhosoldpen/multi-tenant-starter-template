@@ -6,9 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useLiveMessages } from "@/lib/live-messages";
 import { Message, Subgroup } from "@/lib/types/goat";
-
+import { useRealtimeMessages } from "@/lib/realtime-provider";
 interface MessagesGridProps {
   goatId: string;
   ownerUsername: string | undefined;
@@ -29,10 +28,9 @@ export function MessagesGrid({
     data: messages,
     isLoading: loading,
     newMessages,
-    messageCounts,
     error,
     sendMessage
-  } = useLiveMessages(goatId, subgroup, subgroup.is_realtime);
+  } = useRealtimeMessages(goatId, subgroup, subgroup.is_realtime);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;

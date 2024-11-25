@@ -1,6 +1,7 @@
 "use client";
 import GoatsCrud from "@/components/GoatsCRUD";
-import { LiveMessagesProvider, SuperadminProvider } from "@/lib/live-messages";
+import { SuperadminProvider } from "@/lib/mock-provider";
+import { RealtimeMessagesProvider } from "@/lib/realtime-provider";
 
 export default function Page({
   params,
@@ -14,12 +15,12 @@ export default function Page({
 
 function MyComponent({ placeholder }: { placeholder: string }) {
   return (
-    <SuperadminProvider>
-      <LiveMessagesProvider>
+    <>
+      <>
         <div className="h-[calc(100vh-5rem)] py-20">
           <GoatsCrud />
         </div>
-      </LiveMessagesProvider>
-    </SuperadminProvider>
+      </>
+    </>
   );
 }

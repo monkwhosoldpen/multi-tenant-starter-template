@@ -4,6 +4,8 @@ import { Inter } from "next/font/google";
 import { stackServerApp } from "../stack";
 import "./globals.css";
 import { Provider } from "./provider";
+import { RealtimeMessagesProvider } from "@/lib/realtime-provider";
+import { SuperadminProvider } from "@/lib/mock-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,9 +24,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <Provider>
           <StackProvider app={stackServerApp}>
-            <StackTheme theme={{ dark: { background: '#171717' } }}>
-              {children}
-            </StackTheme>
+            <SuperadminProvider>
+              <RealtimeMessagesProvider>
+                <StackTheme theme={{ dark: { background: '#171717' } }}>
+                  {children}
+                </StackTheme>
+              </RealtimeMessagesProvider>
+            </SuperadminProvider>
           </StackProvider>
         </Provider>
       </body>
