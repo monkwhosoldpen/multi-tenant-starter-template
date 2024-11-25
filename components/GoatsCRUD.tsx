@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
-import useSuperAdmin from "@/lib/usesuperamin";
 import { Loader2, Trash2, Plus, ArrowLeft } from 'lucide-react';
 import { GoatCategory, generateMockGoat, generateAllMockData, generateMockSubgroup, generateMockGoatSync } from "@/lib/mockGoatsData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Goat, Subgroup } from "@/lib/types/goat";
+import { Goat, Subgroup, Message } from "@/lib/types/goat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { useLiveMessages } from "@/lib/live-messages";
+import useSuperAdmin, { useLiveMessages } from "@/lib/live-messages";
 import { MessagesGrid } from "./goats/MessagesGrid";
 
 // Mock categories for subgroups
@@ -300,25 +299,27 @@ const GoatsCrud: React.FC = () => {
   };
 
   const handleAddMockMessages = async (username: string) => {
-    if (!username || !selectedSubgroup) return;
+    if (!username || !selectedSubgroup || !selectedGoat) return;
     setAddingMessages(true);
     try {
       const subgroupName = selectedSubgroup.metadata_with_translations.name.english;
       const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
+      const isPublic = selectedSubgroup.is_public;
       
       console.log('Adding mock messages to:', {
         username,
         subgroupName,
         isRealtime: selectedSubgroup.is_realtime,
-        tableType
+        tableType,
+        isPublic
       });
 
       // Create 10 mock messages
-      const mockMessages = Array(10).fill(null).map((_, index) => {
+      const mockMessages: Message[] = Array(10).fill(null).map((_, index) => {
         const date = new Date(Date.now() - (10 - index) * 1000 * 60);
         return {
-          username: username,
-          content: `[${date.toLocaleString()}] ${selectedGoat?.username} in ${subgroupName}: Mock message ${index + 1} - This is a test message from ${selectedGoat?.username} in the ${subgroupName} subgroup.`,
+          username: isPublic ? selectedGoat.username : username, // For public group, use goat's username
+          content: `[${date.toLocaleString()}] ${selectedGoat.username} in ${subgroupName}: Mock message ${index + 1} - This is a test message from ${selectedGoat.username} in the ${subgroupName} subgroup.`,
           created_at: date.toISOString(),
         };
       });
@@ -340,14 +341,16 @@ const GoatsCrud: React.FC = () => {
     setClearingMessages(true);
     try {
       const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
+      const isPublic = username.toLowerCase() === 'public';
       
       console.log('Clearing messages from:', {
         username,
         isRealtime: selectedSubgroup.is_realtime,
-        tableType
+        tableType,
+        isPublic
       });
 
-      const { error } = await deleteMessages(username, tableType, 'DEFAULT');
+      const { error } = await deleteMessages(selectedSubgroup.owner_username, username, tableType, 'DEFAULT');
       if (error) throw error;
 
       // Force refresh of MessagesGrid

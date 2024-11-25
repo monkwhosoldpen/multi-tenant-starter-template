@@ -1,7 +1,6 @@
 "use client";
 import GoatsCrud from "@/components/GoatsCRUD";
-import { LiveMessagesProvider } from "@/lib/live-messages";
-import { SuperadminProvider } from "@/lib/usesuperamin";
+import { LiveMessagesProvider, SuperadminProvider } from "@/lib/live-messages";
 
 export default function Page({
   params,
