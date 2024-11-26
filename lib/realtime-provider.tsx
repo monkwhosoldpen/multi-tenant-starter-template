@@ -1,19 +1,24 @@
 'use client';
 
-import { useEffect, ReactNode, useState, useCallback } from "react";
-import React, { createContext, useContext } from "react";
+import { useEffect, ReactNode, useState, useContext, createContext } from "react";
 import { Message, Subgroup } from "./types/goat";
 import useSuperAdmin from "./mock-provider";
-import { fetchMessages, sendMessage as sendMessageToDb } from "./message-handler";
+
+interface DatabaseMessage {
+  id: string;
+  content: string;
+  username: string;
+  created_at: string;
+}
 
 type RealtimeMessagesContextType = {
-  messages: Message[];
-  subgroupMessageCounts: Record<string, number>;
+  allMessages: Message[];
+  getMessagesForSubgroup: (username: string) => Message[];
 };
 
 const RealtimeMessagesContext = createContext<RealtimeMessagesContextType>({
-  messages: [],
-  subgroupMessageCounts: {}
+  allMessages: [],
+  getMessagesForSubgroup: () => []
 });
 
 export const useRealtimeMessagesContext = () => {
@@ -24,34 +29,21 @@ export const useRealtimeMessagesContext = () => {
   return context;
 };
 
-function formatMessage(message: any, userProfile: any): Message {
+function formatMessage(msg: DatabaseMessage): Message {
   return {
-    content: message.content,
-    username: message.username,
-    created_at: message.created_at,
+    content: msg.content,
+    username: msg.username,
+    created_at: msg.created_at,
   };
 }
-
-const DEFAULT_USER_PROFILE = {
-  id: 9999,
-  name: "System",
-  img_url: [],
-  verified: false,
-  bio: "",
-  username: "system",
-  wallet_addresses: []
-};
 
 export const useRealtimeMessages = (
   goatId?: string,
   subgroup?: Subgroup | null,
-  isRealtime: boolean = true
 ) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessages, setNewMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { CentralSupabase } = useSuperAdmin();
+  const { allMessages, getMessagesForSubgroup } = useRealtimeMessagesContext();
 
   useEffect(() => {
     if (!subgroup?.username) {
@@ -59,111 +51,31 @@ export const useRealtimeMessages = (
       return;
     }
 
-    const loadMessages = async () => {
-      try {
-        setLoading(true);
-        const { data, error } = await fetchMessages(subgroup.username, isRealtime);
-        if (error) throw error;
-        
-        const formattedMessages = (data || []).map(msg => formatMessage(msg, DEFAULT_USER_PROFILE));
-        setMessages(formattedMessages);
-      } catch (err) {
-        console.error('Error loading messages:', err);
-        setError(err as Error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    // Simulate loading time for UI consistency
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 500);
 
-    loadMessages();
+    return () => clearTimeout(timer);
+  }, [subgroup?.username]);
 
-    // Only set up subscription for realtime messages
-    if (isRealtime) {
-      const subscription = CentralSupabase
-        .channel('public:live_messages')
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'live_messages',
-            filter: `username=eq.${subgroup.username}`
-          },
-          (payload: any) => {
-            const formattedMessage = formatMessage(payload.new, DEFAULT_USER_PROFILE);
-            setMessages(prev => [...prev, formattedMessage]);
-            setNewMessages(prev => [...prev, formattedMessage]);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        CentralSupabase.removeChannel(subscription);
-      };
-    }
-  }, [subgroup, isRealtime, CentralSupabase]);
-
-  const sendMessage = useCallback(async (content: string) => {
-    if (!subgroup?.username) return;
-
-    try {
-      const messageData = {
-        content,
-        username: subgroup.username,
-        created_at: new Date().toISOString(),
-      };
-
-      await sendMessageToDb(messageData, isRealtime);
-    } catch (err) {
-      console.error('Error sending message:', err);
-      throw err;
-    }
-  }, [subgroup, isRealtime]);
+  const messages = subgroup ? getMessagesForSubgroup(subgroup.username) : [];
 
   return {
     data: messages,
-    newMessages,
     isLoading: loading,
     error,
-    sendMessage,
   };
 };
 
 export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [subgroupMessageCounts, setSubgroupMessageCounts] = useState<Record<string, number>>({});
+  const [messages, setMessages] = useState<DatabaseMessage[]>([]);
   const { CentralSupabase } = useSuperAdmin();
 
-  // Function to update message counts
-  const updateMessageCount = useCallback((username: string) => {
-    if (!username) {
-      console.warn('Attempted to update count for undefined username');
-      return;
-    }
-    
-    const normalizedUsername = username.toLowerCase();
-    
-    setSubgroupMessageCounts(prev => {
-      // Check if count is already updated to prevent duplicates
-      const currentCount = prev[normalizedUsername] || 0;
-      const newCount = currentCount + 1;
-      
-      // Only update if the count has changed
-      if (currentCount === prev[normalizedUsername]) {
-        return {
-          ...prev,
-          [normalizedUsername]: newCount
-        };
-      }
-      return prev;
-    });
-  }, []);
-
   useEffect(() => {
-    let isSubscribed = true;
-    let messageIds = new Set(); // Track processed message IDs
-
-    const fetchMessages = async () => {
+    console.log('Setting up global realtime subscription');
+    
+    const loadAllMessages = async () => {
       try {
         const { data, error } = await CentralSupabase
           .from("live_messages")
@@ -171,83 +83,59 @@ export const RealtimeMessagesProvider = ({ children }: { children: ReactNode }) 
           .order("created_at", { ascending: true });
 
         if (error) throw error;
-        if (!isSubscribed) return;
-
-        // Calculate initial counts
-        const counts: Record<string, number> = {};
-        data?.forEach((msg: { username?: string; message_id?: number }) => {
-          if (msg.username && msg.message_id) {
-            messageIds.add(msg.message_id); // Track message IDs
-            const username = msg.username.toLowerCase();
-            counts[username] = (counts[username] || 0) + 1;
-          }
-        });
-
-        setSubgroupMessageCounts(counts);
-        
-        const formattedMessages: Message[] = data?.map((msg: Message) => formatMessage(msg, DEFAULT_USER_PROFILE)) || [];
-        setMessages(formattedMessages);
+        console.log(`Initially loaded ${data?.length || 0} messages`);
+        setMessages(data || []);
       } catch (err) {
-        console.error("Error fetching initial messages:", err);
+        console.error('Error loading initial messages:', err);
       }
     };
 
-    fetchMessages();
-
-    // Set up realtime subscription
-    const channel = CentralSupabase
-      .channel("public:live_messages")
+    loadAllMessages();
+    
+    const subscription = CentralSupabase
+      .channel('public:live_messages')
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "INSERT",
-          schema: "public",
-          table: "live_messages",
+          event: '*',
+          schema: 'public',
+          table: 'live_messages'
         },
-        (payload: any) => {
-          if (!isSubscribed) return;
+        (payload: { eventType: string; new: DatabaseMessage; old: DatabaseMessage }) => {
+          console.log('Message event:', payload.eventType, payload.new || payload.old);
           
-          const newMessage = payload.new;
-          const messageId = newMessage?.message_id;
-          
-          // Skip if we've already processed this message
-          if (!messageId || messageIds.has(messageId)) {
-            return;
+          switch (payload.eventType) {
+            case 'INSERT':
+              setMessages(prev => [...prev, payload.new]);
+              break;
+            case 'DELETE':
+              setMessages(prev => prev.filter(msg => msg.id !== payload.old.id));
+              break;
+            case 'UPDATE':
+              setMessages(prev => prev.map(msg => 
+                msg.id === payload.new.id ? payload.new : msg
+              ));
+              break;
           }
-
-          messageIds.add(messageId);
-
-          if (!newMessage?.username) {
-            console.warn('Received message without username:', newMessage);
-            return;
-          }
-
-          setMessages(prev => [
-            ...prev,
-            formatMessage(newMessage, DEFAULT_USER_PROFILE)
-          ]);
-
-          updateMessageCount(newMessage.username);
         }
       )
-      .subscribe((status: any) => {
-        console.log('Subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
-      isSubscribed = false;
-      messageIds.clear();
-      CentralSupabase.removeChannel(channel);
+      console.log('Cleaning up global subscription');
+      CentralSupabase.removeChannel(subscription);
     };
-  }, [CentralSupabase, updateMessageCount]);
+  }, [CentralSupabase]);
 
-  // Debug logging for message count updates
-  useEffect(() => {
-  }, [subgroupMessageCounts]);
+  const getMessagesForSubgroup = (username: string) => {
+    return messages
+      .filter(msg => msg.username === username)
+      .map(formatMessage);
+  };
 
   const contextValue = {
-    messages,
-    subgroupMessageCounts
+    allMessages: messages.map(formatMessage),
+    getMessagesForSubgroup
   };
 
   return (

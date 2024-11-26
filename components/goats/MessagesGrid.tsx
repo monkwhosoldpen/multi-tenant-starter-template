@@ -5,9 +5,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Message, Subgroup } from "@/lib/types/goat";
 import { useRealtimeMessages } from "@/lib/realtime-provider";
+
 interface MessagesGridProps {
   goatId: string;
   ownerUsername: string | undefined;
@@ -23,25 +24,18 @@ export function MessagesGrid({
 }: MessagesGridProps) {
   const [newMessage, setNewMessage] = useState('');
   const actualUsername = ownerUsername?.toLowerCase() || '';
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const {
     data: messages,
     isLoading: loading,
-    newMessages,
     error,
-    sendMessage
-  } = useRealtimeMessages(goatId, subgroup, subgroup.is_realtime);
+  } = useRealtimeMessages(goatId, subgroup);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
-
-    try {
-      await sendMessage(newMessage);
-      setNewMessage('');
-    } catch (err) {
-      console.error('Error in handleSendMessage:', err);
-    }
-  };
+  // Scroll to bottom whenever messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   // Generate a random color for each sender
   const getSenderColor = (sender: string) => {
@@ -121,6 +115,8 @@ export function MessagesGrid({
                 </div>
               );
             })}
+            {/* Invisible element to scroll to */}
+            <div ref={messagesEndRef} style={{ height: '1px' }} />
           </div>
         )}
       </div>
@@ -131,7 +127,7 @@ export function MessagesGrid({
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+            onKeyDown={(e) => e.key === 'Enter' && console.log('Enter key pressed')}
             placeholder={messages.length === 0 ? 
               `Welcome to #${actualUsername}! Send your first message...` : 
               `Message #${actualUsername}`
@@ -139,7 +135,7 @@ export function MessagesGrid({
             className="bg-[#383a40] border-none text-gray-100 placeholder-gray-400 focus-visible:ring-1 focus-visible:ring-[#5865f2]"
           />
           <Button
-            onClick={handleSendMessage}
+            onClick={() => console.log('Button clicked')}
             size="icon"
             className="bg-[#5865f2] hover:bg-[#4752c4] text-white"
           >

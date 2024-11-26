@@ -51,7 +51,7 @@ const GoatsCrud: React.FC = () => {
   const [clearingMessages, setClearingMessages] = useState(false);
   const [messagesKey, setMessagesKey] = useState(0);
   const [creatingDemoGoats, setCreatingDemoGoats] = useState(false);
-  const { subgroupMessageCounts } = useRealtimeMessagesContext();
+  const subgroupMessageCounts: Record<string, number> = {};
 
   const {
     fetchGoats,
