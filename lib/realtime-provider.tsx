@@ -1,27 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { Database, Q } from '@nozbe/watermelondb';
-import LokiJSAdapter from '@nozbe/watermelondb/adapters/lokijs';
-import { Message } from './models/Message';
-import schema from './models/schema';
-import { createTable, addColumns } from '@nozbe/watermelondb/Schema/migrations'
-
-// Initialize database with LokiJS adapter
-const adapter = new LokiJSAdapter({
-  schema,
-  // For now, we'll skip migrations since we're just starting
-  migrations: undefined,
-  useWebWorker: false,
-  useIncrementalIndexedDB: true,
-  dbName: 'messagesDB',
-  experimentalUseIncrementalIndexedDB: true,
-});
-
-const database = new Database({
-  adapter,
-  modelClasses: [Message],
-});
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
+import { useOfflineContext } from './offline-provider';
 
 interface RocketMessage {
   _id: string;
@@ -40,7 +20,7 @@ interface RocketMessage {
 
 type RealtimeContextType = {
   messages: RocketMessage[];
-  subscribeToChannel: (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => () => void;
+  subscribeToChannel: (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => void;
   unsubscribeFromChannel: (channelId: string) => void;
   wsStatus: 'connecting' | 'connected' | 'disconnected';
 };
@@ -64,169 +44,272 @@ export const useRealtimeContext = () => {
   return context;
 };
 
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_DELAY = 5000;
+
+// Modify WebSocket manager to handle active instance better
+const WebSocketManager = {
+  currentInstanceId: 0,
+  activeInstanceId: null as number | null,
+  getNewInstanceId() {
+    this.currentInstanceId += 1;
+    if (this.activeInstanceId === null) {
+      this.activeInstanceId = this.currentInstanceId;
+    }
+    return this.currentInstanceId;
+  },
+  setActiveInstance(id: number) {
+    this.activeInstanceId = id;
+    console.log('🔄 Setting active WebSocket instance:', id);
+  },
+  isActiveInstance(id: number) {
+    return id === this.activeInstanceId;
+  }
+};
+
 export const RealtimeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<RocketMessage[]>([]);
-  const [ws, setWs] = useState<WebSocket | null>(null);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
   const [messageCallbacks] = useState<{ [channelId: string]: (message: RocketMessage | RocketMessage[]) => void }>({});
+  const { saveMessageToDb, loadMessagesFromDb } = useOfflineContext();
+  
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectAttempts = useRef(0);
+  const reconnectTimeout = useRef<NodeJS.Timeout>();
+  const isConnecting = useRef(false);
+  const isMounted = useRef(false);
+  const instanceId = useRef(WebSocketManager.getNewInstanceId());
 
-  // Add function to save message to WatermelonDB
-  const saveMessageToDb = useCallback(async (message: RocketMessage) => {
-    try {
-      await database.write(async () => {
-        const messageCollection = database.get<Message>('messages');
-        await messageCollection.create(record => ({
-          _id: message._id,
-          msg: message.msg,
-          rid: message.rid,
-          user_id: message.u._id,
-          username: message.u.username,
-          user_name: message.u.name,
-          created_at: new Date(message.ts).getTime(),
-          updated_at: new Date(message._updatedAt).getTime()
-        }));
-      });
-    } catch (error) {
-      console.error('Error saving message to local DB:', error);
-    }
-  }, []);
+  // Add activeSubscriptions tracking
+  const activeSubscriptions = useRef<Set<string>>(new Set());
+  const pendingSubscriptions = useRef<Set<string>>(new Set());
 
   const connectWebSocket = useCallback(() => {
-    if (ws) return;
+    if (!isMounted.current) {
+      console.log('🚫 Component not mounted, skipping connection');
+      return;
+    }
 
-    console.log('Connecting to Rocket.Chat WebSocket...');
-    const socket = new WebSocket(ROCKET_CONFIG.WS_URL);
-    setWsStatus('connecting');
+    if (isConnecting.current) {
+      console.log('🔄 Connection attempt already in progress');
+      return;
+    }
 
-    socket.onopen = () => {
-      console.log('WebSocket connected');
-      setWsStatus('connected');
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      console.log('🟢 WebSocket already connected');
+      return;
+    }
 
-      // Connect
-      socket.send(JSON.stringify({
-        msg: 'connect',
-        version: '1',
-        support: ['1']
-      }));
+    try {
+      isConnecting.current = true;
+      console.log('🔌 Initiating WebSocket connection...', {
+        instanceId: instanceId.current,
+        activeInstanceId: WebSocketManager.activeInstanceId
+      });
 
-      // Login
-      socket.send(JSON.stringify({
-        msg: 'method',
-        method: 'login',
-        id: 'login-' + Date.now(),
-        params: [{
-          resume: ROCKET_CONFIG.AUTH.authToken
-        }]
-      }));
-    };
+      const socket = new WebSocket(ROCKET_CONFIG.WS_URL);
+      wsRef.current = socket;
+      setWsStatus('connecting');
 
-    socket.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
-      
-      if (data.msg === 'changed' && data.collection === 'stream-room-messages') {
-        if (data.fields?.args?.[0]) {
-          const rawMessage = data.fields.args[0];
-          const roomId = rawMessage.rid;
-          
-          // Format the message with proper date handling
-          const formattedMessage = {
-            _id: rawMessage._id,
-            msg: rawMessage.msg,
-            ts: rawMessage.ts.$date ? new Date(rawMessage.ts.$date).toISOString() : rawMessage.ts,
-            u: {
-              _id: rawMessage.u._id,
-              username: rawMessage.u.username,
-              name: rawMessage.u.name
-            },
-            rid: rawMessage.rid,
-            _updatedAt: rawMessage._updatedAt.$date ? 
-              new Date(rawMessage._updatedAt.$date).toISOString() : 
-              rawMessage._updatedAt,
-            attachments: rawMessage.attachments || [],
-            reactions: rawMessage.reactions || {}
-          };
-          
-          if (messageCallbacks[roomId]) {
-            await saveMessageToDb(formattedMessage);
-            setMessages(prev => [...prev, formattedMessage]);
-            messageCallbacks[roomId](formattedMessage);
+      socket.onopen = () => {
+        console.log('✅ WebSocket connected successfully', {
+          readyState: socket.readyState,
+          wsRef: !!wsRef.current
+        });
+        
+        setWsStatus('connected');
+        reconnectAttempts.current = 0;
+        isConnecting.current = false;
+
+        console.log('🔑 Sending connect message...');
+        socket.send(JSON.stringify({
+          msg: 'connect',
+          version: '1',
+          support: ['1']
+        }));
+
+        console.log('🔐 Sending login message...');
+        socket.send(JSON.stringify({
+          msg: 'method',
+          method: 'login',
+          id: 'login-' + Date.now(),
+          params: [{
+            resume: ROCKET_CONFIG.AUTH.authToken
+          }]
+        }));
+      };
+
+      socket.onmessage = async (event) => {
+        const data = JSON.parse(event.data);
+        console.log('📨 Received WebSocket message:', data);
+        
+        if (data.msg === 'changed' && data.collection === 'stream-room-messages') {
+          console.log('📝 Processing new message...');
+          if (data.fields?.args?.[0]) {
+            const rawMessage = data.fields.args[0];
+            const roomId = rawMessage.rid;
+            
+            // Format the message with proper date handling
+            const formattedMessage = {
+              _id: rawMessage._id,
+              msg: rawMessage.msg,
+              ts: rawMessage.ts.$date ? new Date(rawMessage.ts.$date).toISOString() : rawMessage.ts,
+              u: {
+                _id: rawMessage.u._id,
+                username: rawMessage.u.username,
+                name: rawMessage.u.name
+              },
+              rid: rawMessage.rid,
+              _updatedAt: rawMessage._updatedAt.$date ? 
+                new Date(rawMessage._updatedAt.$date).toISOString() : 
+                rawMessage._updatedAt,
+              attachments: rawMessage.attachments || [],
+              reactions: rawMessage.reactions || {}
+            };
+            
+            if (messageCallbacks[roomId]) {
+              await saveMessageToDb(formattedMessage);
+              setMessages(prev => [...prev, formattedMessage]);
+              messageCallbacks[roomId](formattedMessage);
+            }
           }
         }
-      }
-    };
+      };
 
-    socket.onclose = () => {
-      console.log('WebSocket disconnected');
-      setWsStatus('disconnected');
-      setWs(null);
-      setTimeout(connectWebSocket, 5000);
-    };
+      socket.onclose = (event) => {
+        console.log('🔌 WebSocket disconnected', {
+          instanceId: instanceId.current,
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+          wsRef: !!wsRef.current
+        });
+        
+        if (wsRef.current === socket) {
+          wsRef.current = null;
+          setWsStatus('disconnected');
+        }
+        isConnecting.current = false;
 
-    socket.onerror = (error) => {
-      console.error('WebSocket error:', error);
-    };
+        // Only attempt reconnect if this is the latest instance
+        if (WebSocketManager.activeInstanceId === instanceId.current && 
+            isMounted.current && 
+            !event.wasClean && 
+            reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
+          reconnectAttempts.current++;
+          console.log(`⏳ Scheduling reconnect attempt ${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY}ms`);
+          
+          if (reconnectTimeout.current) {
+            clearTimeout(reconnectTimeout.current);
+          }
+          reconnectTimeout.current = setTimeout(connectWebSocket, RECONNECT_DELAY);
+        }
+      };
 
-    setWs(socket);
-  }, [ws, saveMessageToDb, messageCallbacks]);
+      socket.onerror = (error) => {
+        console.log('❌ WebSocket error:', error);
+        isConnecting.current = false;
+      };
 
-  // Add function to load messages from WatermelonDB
-  const loadMessagesFromDb = useCallback(async (channelId: string) => {
-    try {
-      const messageCollection = database.get<Message>('messages');
-      const messages = await messageCollection
-        .query(Q.where('rid', channelId))
-        .fetch();
-
-      return messages.map(msg => ({
-        _id: msg._id,
-        msg: msg.msg,
-        ts: new Date(msg.createdAt).toISOString(),
-        u: {
-          _id: msg.userId,
-          username: msg.username,
-          name: msg.userName
-        },
-        rid: msg.rid,
-        _updatedAt: new Date(msg.updatedAt).toISOString(),
-        attachments: [],
-        reactions: {}
-      }));
     } catch (error) {
-      console.error('Error loading messages from DB:', error);
-      return null;
+      console.log('❌ Error creating WebSocket:', error);
+      wsRef.current = null;
+      setWsStatus('disconnected');
+      isConnecting.current = false;
     }
   }, []);
 
-  const subscribeToChannel = useCallback(async (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => {
-    console.log(`Subscribing to Rocket.Chat channel: ${channelId}`);
-    messageCallbacks[channelId] = callback;
+  // Single useEffect for WebSocket lifecycle
+  useEffect(() => {
+    console.log('🔄 Initial WebSocket setup', { 
+      instanceId: instanceId.current,
+      activeInstanceId: WebSocketManager.activeInstanceId
+    });
+    
+    isMounted.current = true;
+    reconnectAttempts.current = 0;
+    WebSocketManager.setActiveInstance(instanceId.current);
+    connectWebSocket();
 
-    // First try to load from local DB
-    const cachedMessages = await loadMessagesFromDb(channelId);
-    if (cachedMessages && cachedMessages.length > 0) {
-      console.log('Using cached messages from DB');
-      setMessages(cachedMessages);
-      callback(cachedMessages);
+    return () => {
+      console.log('🧹 Cleaning up WebSocket resources', { 
+        instanceId: instanceId.current,
+        activeInstanceId: WebSocketManager.activeInstanceId
+      });
+      
+      isMounted.current = false;
+      isConnecting.current = false;
+      
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = undefined;
+      }
+      
+      if (wsRef.current) {
+        console.log('🔴 Closing WebSocket connection', { 
+          instanceId: instanceId.current,
+          activeInstanceId: WebSocketManager.activeInstanceId
+        });
+        const socket = wsRef.current;
+        wsRef.current = null;
+        socket.close(1000, 'Component unmounting');
+      }
+      
+      reconnectAttempts.current = MAX_RECONNECT_ATTEMPTS;
+    };
+  }, [connectWebSocket]);
+
+  const subscribeToChannel = useCallback(async (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => {
+    // Check if already subscribed or pending
+    if (activeSubscriptions.current.has(channelId)) {
+      console.log('📌 Already subscribed to channel:', channelId);
+      return;
     }
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      // Subscribe to new messages
-      ws.send(JSON.stringify({
-        msg: 'sub',
-        id: `room-messages-${channelId}`,
-        name: 'stream-room-messages',
-        params: [
-          channelId,
-          {
-            useCollection: false,
-            args: [{ 'visitorToken': false }]
-          }
-        ]
-      }));
+    if (pendingSubscriptions.current.has(channelId)) {
+      console.log('⏳ Subscription already pending for channel:', channelId);
+      return;
+    }
 
-      // Only fetch from API if we don't have cached data
-      if (!cachedMessages || cachedMessages.length === 0) {
-        try {
+    console.log('📡 Subscribing to channel:', channelId, {
+      wsStatus,
+      wsExists: !!wsRef.current,
+      readyState: wsRef.current?.readyState,
+      isConnecting: isConnecting.current
+    });
+
+    pendingSubscriptions.current.add(channelId);
+    messageCallbacks[channelId] = callback;
+
+    try {
+      console.log('🔍 Checking local cache for messages...');
+      const cachedMessages = await loadMessagesFromDb(channelId);
+      if (cachedMessages && cachedMessages.length > 0) {
+        console.log('📦 Using cached messages:', cachedMessages.length);
+        setMessages(cachedMessages);
+        callback(cachedMessages);
+      }
+
+      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+        console.log('🔄 WebSocket not ready, attempting to connect...');
+        connectWebSocket();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log('🔔 Sending subscription message to WebSocket');
+        wsRef.current.send(JSON.stringify({
+          msg: 'sub',
+          id: `room-messages-${channelId}`,
+          name: 'stream-room-messages',
+          params: [channelId, { useCollection: false, args: [{ 'visitorToken': false }] }]
+        }));
+
+        // Mark as actively subscribed
+        activeSubscriptions.current.add(channelId);
+
+        if (!cachedMessages || cachedMessages.length === 0) {
+          console.log('🌐 Fetching messages from API...');
           const response = await fetch(`${ROCKET_CONFIG.BASE_URL}/channels.messages?roomId=${channelId}`, {
             headers: {
               "X-Auth-Token": ROCKET_CONFIG.AUTH.authToken,
@@ -238,39 +321,102 @@ export const RealtimeProvider: React.FC<{ children: ReactNode }> = ({ children }
           const messages = data.messages || [];
           console.log('Fetched initial messages from API:', messages);
           
-          // Save messages to WatermelonDB
           await Promise.all(messages.map(msg => saveMessageToDb(msg)));
-          
           setMessages(messages);
           callback(messages);
-        } catch (error) {
-          console.error('Error fetching messages:', error);
-          setMessages([]);
-          callback([]);
         }
+      } else {
+        console.log('⚠️ WebSocket not ready for subscription:', {
+          wsExists: !!wsRef.current,
+          readyState: wsRef.current?.readyState,
+          wsStatus,
+          isConnecting: isConnecting.current
+        });
       }
+    } catch (error) {
+      console.log('❌ Error in subscription process:', error);
+    } finally {
+      pendingSubscriptions.current.delete(channelId);
     }
-  }, [ws, messageCallbacks, saveMessageToDb, loadMessagesFromDb]);
-
-  useEffect(() => {
-    connectWebSocket();
-    return () => {
-      if (ws) {
-        ws.close();
-      }
-    };
-  }, [connectWebSocket, ws]);
+  }, [messageCallbacks, saveMessageToDb, loadMessagesFromDb, wsStatus, connectWebSocket]);
 
   const unsubscribeFromChannel = useCallback((channelId: string) => {
-    delete messageCallbacks[channelId];
-    setMessages([]); // Clear messages when unsubscribing
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        msg: 'unsub',
-        id: `room-messages-${channelId}`
-      }));
+    console.log('🔕 Unsubscribing from channel:', channelId, {
+      wsStatus,
+      wsExists: !!wsRef.current,
+      readyState: wsRef.current?.readyState
+    });
+    
+    // Only clear messages if we're actually changing channels
+    if (activeSubscriptions.current.has(channelId)) {
+      delete messageCallbacks[channelId];
+      activeSubscriptions.current.delete(channelId);
+      pendingSubscriptions.current.delete(channelId);
+      setMessages([]);
+
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          msg: 'unsub',
+          id: `room-messages-${channelId}`
+        }));
+      }
     }
-  }, [ws, messageCallbacks]);
+  }, [messageCallbacks, wsStatus]);
+
+  // Modify the cleanup effect to only run on full unmount
+  useEffect(() => {
+    const cleanup = () => {
+      console.log('🧹 Cleaning up all subscriptions and WebSocket');
+      
+      // Clear all subscriptions first
+      activeSubscriptions.current.forEach(channelId => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            msg: 'unsub',
+            id: `room-messages-${channelId}`
+          }));
+        }
+      });
+      
+      activeSubscriptions.current.clear();
+      pendingSubscriptions.current.clear();
+      
+      // Only close WebSocket if we're actually unmounting
+      if (wsRef.current && !isMounted.current) {
+        console.log('🔴 Closing WebSocket connection (final cleanup)');
+        wsRef.current.close(1000, 'Provider unmounting');
+        wsRef.current = null;
+      }
+    };
+
+    // Set up beforeunload handler for page close
+    window.addEventListener('beforeunload', cleanup);
+
+    return () => {
+      isMounted.current = false;
+      window.removeEventListener('beforeunload', cleanup);
+      cleanup();
+    };
+  }, []);
+
+  // Add ping/pong handling to keep connection alive
+  useEffect(() => {
+    let pingInterval: NodeJS.Timeout;
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      pingInterval = setInterval(() => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({ msg: 'ping' }));
+        }
+      }, 25000); // Send ping every 25 seconds
+    }
+
+    return () => {
+      if (pingInterval) {
+        clearInterval(pingInterval);
+      }
+    };
+  }, [wsStatus]);
 
   return (
     <RealtimeContext.Provider value={{

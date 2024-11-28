@@ -12,17 +12,26 @@ export function MessagesGrid({ subgroup }: MessagesGridProps) {
   const { messages, wsStatus, subscribeToChannel, unsubscribeFromChannel } = useRealtimeContext();
 
   useEffect(() => {
-    if ('_id' in subgroup && wsStatus === 'connected') {
-      subscribeToChannel(subgroup._id, (message) => {
-        console.log('📥 Received message:', message);
-      });
+    let isSubscribed = true;
 
-      return () => {
-        if ('_id' in subgroup) {
-          unsubscribeFromChannel(subgroup._id);
-        }
-      };
-    }
+    const setupSubscription = async () => {
+      if ('_id' in subgroup && wsStatus === 'connected' && isSubscribed) {
+        await subscribeToChannel(subgroup._id, (message) => {
+          if (isSubscribed) {
+            console.log('📥 Received message:', message);
+          }
+        });
+      }
+    };
+
+    setupSubscription();
+
+    return () => {
+      isSubscribed = false;
+      if ('_id' in subgroup) {
+        unsubscribeFromChannel(subgroup._id);
+      }
+    };
   }, [subgroup, wsStatus, subscribeToChannel, unsubscribeFromChannel]);
 
   if (wsStatus === 'connecting') {
