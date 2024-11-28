@@ -1,7 +1,7 @@
 "use client";
 import GoatsCrud from "@/components/GoatsCRUD";
 import { SuperadminProvider } from "@/lib/mock-provider";
-import { RealtimeMessagesProvider } from "@/lib/realtime-provider";
+import { RealtimeProvider } from "@/lib/realtime-provider";
 
 export default function Page({
   params,
@@ -9,7 +9,11 @@ export default function Page({
   params: { placeholder: string; teamId: string };
 }) {
   return (
-    <MyComponent placeholder={params.placeholder} />
+    <SuperadminProvider>
+      <RealtimeProvider>
+        <GoatsCrud />
+      </RealtimeProvider>
+    </SuperadminProvider>
   )
 }
 

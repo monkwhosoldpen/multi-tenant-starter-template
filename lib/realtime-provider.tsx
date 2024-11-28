@@ -321,7 +321,7 @@ export const RealtimeProvider: React.FC<{ children: ReactNode }> = ({ children }
           const messages = data.messages || [];
           console.log('Fetched initial messages from API:', messages);
           
-          await Promise.all(messages.map(msg => saveMessageToDb(msg)));
+          await Promise.all(messages.map((msg: any) => saveMessageToDb(msg)));
           setMessages(messages);
           callback(messages);
         }

@@ -10,13 +10,13 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import useSuperAdmin from "@/lib/mock-provider";
 import { MessagesGrid } from "./goats/MessagesGrid";
-import { useRealtimeMessagesContext } from "@/lib/realtime-provider";
+import { useRealtimeContext } from "@/lib/realtime-provider";
 import { RocketStatsModal } from "./RocketStatsModal";
 import { syncSubgroupWithRocket } from "@/lib/rocket-sync";
 import { OfflineContext, useOfflineContext } from '@/lib/offline-provider';
 
 // Mock categories for subgroups
-export const SUBGROUP_CATEGORIES = [
+export const SUBGROUP_CATEGORIES: any = [
   { id: 'cricket', name: 'Cricket' },
   { id: 'football', name: 'Football' },
   { id: 'basketball', name: 'Basketball' },
@@ -149,7 +149,6 @@ const GoatsCrud: React.FC = () => {
             await saveChannelToDb(channel);
           } catch (err) {
             console.warn('Warning: Failed to cache channel:', channel.name, err);
-            // Continue with other channels even if one fails to cache
           }
         }
         
@@ -188,19 +187,7 @@ const GoatsCrud: React.FC = () => {
 
       // Step 2: Create Elon Musk profile in Supabase
       console.log('👤 Creating Elon Musk profile...');
-      const mockElonMusk = {
-        uid: crypto.randomUUID(),
-        username: 'ElonMusk',
-        category: 'technology',
-        verified: true,
-        metadata_with_translations: {
-          name: { english: 'Elon Musk' },
-          bio: { english: 'CEO of Tesla, SpaceX, and X' }
-        },
-        img_url: 'https://placehold.co/150/808080/000000?text=ElonMusk',
-        cover_url: 'https://placehold.co/600x200/808080/000000?text=ElonMusk'
-      };
-
+      const mockElonMusk = generateMockGoatSync('ElonMusk', 'technology');
       const { error: goatError } = await createGoat(mockElonMusk);
       if (goatError) throw goatError;
 
@@ -214,7 +201,12 @@ const GoatsCrud: React.FC = () => {
       console.log('📁 Creating channels:', mockData.subgroups.length);
       for (const subgroup of mockData.subgroups) {
         console.log('📂 Creating channel:', subgroup.name);
-        await syncSubgroupWithRocket(subgroup);
+        await syncSubgroupWithRocket({
+          name: subgroup.name,
+          type: 'c',
+          username: 'ElonMusk',
+          description: `Channel for ${subgroup.name}`
+        });
         // Wait between channel creations
         await new Promise(resolve => setTimeout(resolve, 500));
       }
@@ -319,12 +311,15 @@ const GoatsCrud: React.FC = () => {
     try {
       // Create subgroups for each category
       for (const { id: type } of SUBGROUP_CATEGORIES) {
-        const subgroup = generateMockSubgroup(ownerUsername, type);
-        const { error } = await createSubgroup(subgroup);
-        if (error) {
-          console.error(`Error creating subgroup ${type}:`, error);
-          continue;
-        }
+        const subgroup = generateMockSubgroup(`${type}-channel`);
+        await syncSubgroupWithRocket({
+          name: subgroup.name,
+          type: 'c',
+          username: ownerUsername,
+          description: `Channel for ${type}`
+        });
+        // Wait between channel creations
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       await loadSubgroups(ownerUsername);
@@ -704,9 +699,6 @@ const GoatsCrud: React.FC = () => {
           {selectedSubgroup && (
             <MessagesGrid
               key={messagesKey}
-              goatId={selectedGoat?.username || ''}
-              ownerUsername={selectedSubgroup.username}
-              selectedCategory={selectedCategory}
               subgroup={selectedSubgroup}
             />
           )}

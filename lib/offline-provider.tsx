@@ -7,19 +7,13 @@ import { Message } from './models/Message';
 import { Channel } from './models/Channel';
 import schema from './models/schema';
 import { schemaMigrations } from '@nozbe/watermelondb/Schema/migrations';
-import Loki from 'lokijs';
-
-// Define migrations
-const migrations = schemaMigrations({
-  migrations: [
-    // We'll add migrations here when needed
-  ]
-});
 
 // Initialize database with LokiJS adapter
 const adapter = new LokiJSAdapter({
   schema,
-  migrations,
+  migrations: schemaMigrations({
+    migrations: []
+  }),
   useWebWorker: false,
   useIncrementalIndexedDB: false,
   dbName: 'messagesDB',
@@ -28,15 +22,18 @@ const adapter = new LokiJSAdapter({
   },
   onQuotaExceededError: (error) => {
     console.error('[🍉] Storage quota exceeded:', error);
-  },
-  lokiOptions: {
-    autosave: true,
-    autosaveInterval: 5000,
-    verbose: true
   }
 });
 
 let database: Database | null = null;
+
+// Helper function to ensure database is initialized
+const ensureDatabase = () => {
+  if (!database) {
+    throw new Error('Database not initialized');
+  }
+  return database;
+};
 
 interface RocketMessage {
   _id: string;
@@ -49,8 +46,6 @@ interface RocketMessage {
   };
   rid: string;
   _updatedAt: string;
-  attachments?: any[];
-  reactions?: any;
 }
 
 type OfflineContextType = {
@@ -74,18 +69,15 @@ export const useOfflineContext = () => {
 export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
 
-  // Initialize database
   useEffect(() => {
     const initDB = async () => {
       try {
         if (!database) {
-          // Initialize the database first
           database = new Database({
             adapter,
             modelClasses: [Message, Channel]
           });
 
-          // Test database connection with a simple write operation
           await database.write(async () => {
             console.log('[🍉] Testing database write...');
           });
@@ -105,14 +97,10 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
     return () => {
       if (database) {
         try {
-          // Close adapter connections if they exist
           if (adapter && typeof (adapter as any).close === 'function') {
             (adapter as any).close();
           }
-          
-          // Reset database reference
           database = null;
-          
           console.log('[🍉] Database connections closed');
         } catch (error) {
           console.error('[🍉] Error closing database connections:', error);
@@ -123,18 +111,21 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const saveMessageToDb = useCallback(async (message: RocketMessage) => {
     try {
-      await database.write(async () => {
-        const messageCollection = database.get<Message>('messages');
-        await messageCollection.create(record => ({
-          _id: message._id,
-          msg: message.msg,
-          rid: message.rid,
-          user_id: message.u._id,
-          username: message.u.username,
-          user_name: message.u.name,
-          created_at: new Date(message.ts).getTime(),
-          updated_at: new Date(message._updatedAt).getTime()
-        }));
+      const db = ensureDatabase();
+      await db.write(async () => {
+        const messageCollection = db.get<Message>('messages');
+        await messageCollection.create(record => {
+          Object.assign(record._raw, {
+            _id: message._id,
+            msg: message.msg,
+            rid: message.rid,
+            user_id: message.u._id,
+            username: message.u.username,
+            user_name: message.u.name,
+            created_at: new Date(message.ts).getTime(),
+            updated_at: new Date(message._updatedAt).getTime()
+          });
+        });
       });
     } catch (error) {
       console.error('Error saving message to local DB:', error);
@@ -142,14 +133,13 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   const loadMessagesFromDb = useCallback(async (channelId: string) => {
-    console.log('🔍 Loading messages for channel ID:', channelId);
     try {
-      const messageCollection = database.get<Message>('messages');
+      const db = ensureDatabase();
+      const messageCollection = db.get<Message>('messages');
       const messages = await messageCollection
         .query(Q.where('rid', channelId))
         .fetch();
 
-      console.log('📦 Messages loaded:', messages);
       return messages.map(msg => ({
         _id: msg._id,
         msg: msg.msg,
@@ -160,9 +150,7 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
           name: msg.userName
         },
         rid: msg.rid,
-        _updatedAt: new Date(msg.updatedAt).toISOString(),
-        attachments: [],
-        reactions: {}
+        _updatedAt: new Date(msg.updatedAt).toISOString()
       }));
     } catch (error) {
       console.error('Error loading messages from DB:', error);
@@ -170,68 +158,37 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   }, []);
 
-  const saveChannelToDb = async (channel: any) => {
-    console.log('💾 Saving channel to local DB:', channel.name);
-    
+  const saveChannelToDb = useCallback(async (channel: any) => {
     try {
-      const channelsCollection = database!.get<Channel>('channels');
-      
-      // Check if the channel already exists
-      const existingChannels = await channelsCollection
-        .query(Q.where('name', channel.name))
-        .fetch();
-      
-      const existingChannel = existingChannels[0];
-      
-      await database.write(async () => {
-        if (existingChannel) {
-          console.log('📝 Channel already exists, updating...');
-          await existingChannel.updateChannel({
+      const db = ensureDatabase();
+      const channelsCollection = db.get<Channel>('channels');
+      await db.write(async () => {
+        await channelsCollection.create(record => {
+          Object.assign(record._raw, {
+            _id: channel._id || crypto.randomUUID(),
             name: channel.name,
             type: channel.type,
             username: channel.username,
-            description: channel.description
+            description: channel.description,
+            created_at: Date.now(),
+            updated_at: Date.now()
           });
-        } else {
-          console.log('📝 Creating new channel...');
-          await channelsCollection.create(record => {
-            Object.assign(record._raw, {
-              name: channel.name,
-              type: channel.type,
-              username: channel.username,
-              description: channel.description,
-              created_at: Date.now(),
-              updated_at: Date.now()
-            });
-          });
-        }
+        });
       });
-      
-      console.log('✅ Channel saved successfully');
     } catch (error) {
-      console.error('❌ Error saving channel to local DB:', error);
+      console.error('Error saving channel to DB:', error);
       throw error;
     }
-  };
+  }, []);
 
-  const loadChannelsFromDb = async (username: string) => {
+  const loadChannelsFromDb = useCallback(async (username: string) => {
     try {
-      if (!isReady || !database) {
-        console.log('💤 Database not ready yet');
-        return [];
-      }
-
-      const channelsCollection = database.get<Channel>('channels');
-      
-      // Add debug logging
-      console.log('🔍 Querying channels for username:', username);
-      
+      const db = ensureDatabase();
+      const channelsCollection = db.get<Channel>('channels');
       const channels = await channelsCollection
-        .query(Q.where('username', Q.eq(username)))
+        .query(Q.where('username', username))
         .fetch();
 
-      console.log('📦 Found channels:', channels.length);
-      
       return channels.map(channel => ({
         _id: channel._id,
         name: channel.name,
@@ -242,43 +199,41 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
         updated_at: channel.updatedAt
       }));
     } catch (error) {
-      console.error('❌ Error loading channels from local DB:', error);
+      console.error('Error loading channels from DB:', error);
       return [];
     }
-  };
+  }, []);
 
-  const clearChannelsFromDb = async (username: string) => {
+  const clearChannelsFromDb = useCallback(async (username: string) => {
     try {
-      await database.write(async () => {
-        const channelsCollection = database.get<Channel>('channels');
+      const db = ensureDatabase();
+      await db.write(async () => {
+        const channelsCollection = db.get<Channel>('channels');
         const channels = await channelsCollection
-          .query()
-          .where('username', username)
+          .query(Q.where('username', username))
           .fetch();
         
-        await database.batch(
+        await db.batch(
           ...channels.map(channel => channel.prepareDestroyPermanently())
         );
       });
-      console.log('✅ Channels cleared from local DB for user:', username);
     } catch (error) {
-      console.error('❌ Error clearing channels from local DB:', error);
+      console.error('Error clearing channels from DB:', error);
+      throw error;
     }
+  }, []);
+
+  const value = {
+    saveMessageToDb,
+    loadMessagesFromDb,
+    saveChannelToDb,
+    loadChannelsFromDb,
+    clearChannelsFromDb
   };
 
-  if (!isReady) {
-    return <div>Loading database...</div>;
-  }
-
   return (
-    <OfflineContext.Provider value={{
-      saveMessageToDb,
-      loadMessagesFromDb,
-      saveChannelToDb,
-      loadChannelsFromDb,
-      clearChannelsFromDb
-    }}>
-      {children}
+    <OfflineContext.Provider value={value}>
+      {isReady ? children : null}
     </OfflineContext.Provider>
   );
 }; 

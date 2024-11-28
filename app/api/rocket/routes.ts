@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { CATEGORIES } from './create/route';
+import { CATEGORIES } from '@/lib/constants';
 
 // Rocket.Chat API details
 const BASE_URL = "https://amigurumi-gaur.pikapod.net/api/v1";

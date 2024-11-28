@@ -6,6 +6,7 @@ export default appSchema({
     tableSchema({
       name: 'channels',
       columns: [
+        { name: '_id', type: 'string' },
         { name: 'name', type: 'string' },
         { name: 'type', type: 'string' },
         { name: 'username', type: 'string' },
@@ -17,6 +18,7 @@ export default appSchema({
     tableSchema({
       name: 'messages',
       columns: [
+        { name: '_id', type: 'string' },
         { name: 'msg', type: 'string' },
         { name: 'rid', type: 'string' },
         { name: 'user_id', type: 'string' },

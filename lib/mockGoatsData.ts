@@ -73,55 +73,19 @@ export const generateMockMessages = (count: number = 10, username: string, subgr
     });
 };
 
-export const generateMockSubgroup = (ownerUsername: string, category: string): Subgroup => {
-    const username = `${ownerUsername}_${category}`.toLowerCase();
-    const capitalizedName = category.charAt(0).toUpperCase() + category.slice(1);
-
-    // Generate a random color for demo category
-    const getRandomColor = () => {
-        const colors = ['FF5733', '33FF57', '3357FF', 'FF33F6', 'F6FF33', '33FFF6'];
-        return colors[Math.floor(Math.random() * colors.length)];
-    };
-
-    const color = ownerUsername.includes('Demo') ? getRandomColor() : '808080';
-    const textColor = ownerUsername.includes('Demo') ? 'FFFFFF' : '000000';
-
-    return {
-        username,
-        verified: Math.random() > 0.5,
-        metadata_with_translations: {
-            bio: {
-                english: `Official ${capitalizedName} group for ${ownerUsername}`,
-                hindi: "यादृच्छिक बायो",
-                telugu: "యాదృచ్ఛిక జీవితం"
-            },
-            name: {
-                english: capitalizedName,
-                hindi: "यादृच्छिक नाम",
-                telugu: "యాదృచ్ఛిక పేరు"
-            }
-        },
-        img_url: `https://placehold.co/150/${color}/${textColor}?text=${username}`,
-        cover_url: `https://placehold.co/600x200/${color}/${textColor}?text=${username}`,
-        category: category,
-        is_premium: true,
-        is_locked: true,
-        is_public: false,
-        is_realtime: true,
-        is_published: true,
-        is_subgroup: true,
-        owner_username: ownerUsername,
-        is_secondary_stream: false,
-        is_party: false,
-        is_historical: false,
-        is_open: true,
-        is_demo: ownerUsername.includes('Demo'),
-        tags: [],
-        entity_type: [],
-        blocked_profile_ids: [],
-        latest_message: null
-    };
-};
+export const generateMockSubgroup = (name: string) => ({
+    name,
+    type: 'c',  // channel type
+    username: 'ElonMusk',  // default username
+    description: `Channel for ${name}`,
+    // Only include the fields needed for Rocket.Chat sync
+    extraData: {
+        broadcast: false,
+        encrypted: false,
+        teamId: null,
+        teamMain: false
+    }
+});
 
 // Synchronous version for mock data generation
 export const generateMockGoatSync = (username: string, category: string): Goat => {
@@ -191,53 +155,11 @@ export const generateMockGoatCategory = (category: GoatCategory): GoatCategoryDa
 };
 
 export const generateAllMockData = () => {
-    // Create subgroups that will become Rocket.Chat channels
-    const subgroups = [
-        {
-            name: 'spacex-updates',  // Changed to lowercase with hyphens
-            type: 'p',  // private channel
-            description: 'Latest updates from SpaceX',
-            members: ['ElonMusk'],
-            readOnly: false,
-            extraData: {
-                broadcast: false,
-                encrypted: false,
-                teamId: null,
-                teamMain: false
-            }
-        },
-        {
-            name: 'tesla-news',  // Changed to lowercase with hyphens
-            type: 'p',
-            description: 'Tesla company news and updates',
-            members: ['ElonMusk'],
-            readOnly: false,
-            extraData: {
-                broadcast: false,
-                encrypted: false,
-                teamId: null,
-                teamMain: false
-            }
-        },
-        {
-            name: 'twitter-x',  // Changed to lowercase with hyphens
-            type: 'p',
-            description: 'Discussions about Twitter/X platform',
-            members: ['ElonMusk'],
-            readOnly: false,
-            extraData: {
-                broadcast: false,
-                encrypted: false,
-                teamId: null,
-                teamMain: false
-            }
-        }
-    ].map(subgroup => ({
-        ...subgroup,
-        id: crypto.randomUUID(),
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-    }));
+    const subgroups: any[] = [
+        generateMockSubgroup('spacex-updates'),
+        generateMockSubgroup('tesla-news'),
+        generateMockSubgroup('twitter-x')
+    ];
 
     return {
         subgroups

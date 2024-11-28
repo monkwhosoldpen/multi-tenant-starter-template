@@ -6,25 +6,37 @@ export const ROCKET_CONFIG = {
     }
 } as const;
 
-// Store auth tokens in memory (consider using a more persistent solution in production)
-let authTokens = ROCKET_CONFIG.DEFAULT_AUTH;
-
-export const getHeaders = () => {
-  if (!authTokens) {
-    throw new Error('Not authenticated');
-  }
-
-  return {
-    "X-Auth-Token": authTokens.authToken,
-    "X-User-Id": authTokens.userId,
-    "Content-Type": "application/json"
-  };
+// Define the type for auth tokens
+type AuthTokens = {
+    userId: string;
+    authToken: string;
 };
 
-export const setAuthTokens = (tokens: { userId: string; authToken: string }) => {
-  authTokens = tokens;
+// Store auth tokens in memory (consider using a more persistent solution in production)
+let authTokens: AuthTokens = {
+    userId: ROCKET_CONFIG.DEFAULT_AUTH.userId,
+    authToken: ROCKET_CONFIG.DEFAULT_AUTH.authToken
+};
+
+export const getHeaders = () => {
+    if (!authTokens) {
+        throw new Error('Not authenticated');
+    }
+
+    return {
+        "X-Auth-Token": authTokens.authToken,
+        "X-User-Id": authTokens.userId,
+        "Content-Type": "application/json"
+    };
+};
+
+export const setAuthTokens = (tokens: AuthTokens) => {
+    authTokens = tokens;
 };
 
 export const clearAuthTokens = () => {
-  authTokens = ROCKET_CONFIG.DEFAULT_AUTH;
+    authTokens = {
+        userId: ROCKET_CONFIG.DEFAULT_AUTH.userId,
+        authToken: ROCKET_CONFIG.DEFAULT_AUTH.authToken
+    };
 }; 

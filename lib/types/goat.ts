@@ -8,6 +8,7 @@ export interface Message {
 }
 
 export interface Subgroup {
+    id: string;
     stream_id?: any;
     username: string;
     verified: boolean;

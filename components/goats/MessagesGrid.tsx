@@ -3,46 +3,37 @@
 import { useEffect } from 'react';
 import { useRealtimeContext } from '@/lib/realtime-provider';
 import { SubgroupOrChannel } from '@/lib/types/goat';
+import { useOfflineContext } from '@/lib/offline-provider';
 
 interface MessagesGridProps {
   subgroup: SubgroupOrChannel;
 }
 
-export function MessagesGrid({ subgroup }: MessagesGridProps) {
-  const { messages, wsStatus, subscribeToChannel, unsubscribeFromChannel } = useRealtimeContext();
-
+export const MessagesGrid = ({ subgroup }: MessagesGridProps) => {
+  const { messages, subscribeToChannel, unsubscribeFromChannel } = useRealtimeContext();
+  const { loadMessagesFromDb } = useOfflineContext();
+  
   useEffect(() => {
-    let isSubscribed = true;
-
-    const setupSubscription = async () => {
-      if ('_id' in subgroup && wsStatus === 'connected' && isSubscribed) {
-        await subscribeToChannel(subgroup._id, (message) => {
-          if (isSubscribed) {
-            console.log('📥 Received message:', message);
-          }
-        });
+    const channelId = 'rid' in subgroup ? subgroup.rid : subgroup._id;
+    
+    // First try to load from local DB
+    loadMessagesFromDb(channelId).then(cachedMessages => {
+      if (cachedMessages && cachedMessages.length > 0) {
+        console.log('📦 Using cached messages:', cachedMessages.length);
+        // Handle cached messages
       }
-    };
-
-    setupSubscription();
-
+    });
+    // Then subscribe to real-time updates
+    subscribeToChannel(channelId, (message) => {
+      // Handle real-time updates
+    });
+    
     return () => {
-      isSubscribed = false;
-      if ('_id' in subgroup) {
-        unsubscribeFromChannel(subgroup._id);
-      }
+      unsubscribeFromChannel(channelId);
     };
-  }, [subgroup, wsStatus, subscribeToChannel, unsubscribeFromChannel]);
+  }, [subgroup, subscribeToChannel, unsubscribeFromChannel, loadMessagesFromDb]);
 
-  if (wsStatus === 'connecting') {
-    return (
-      <div className="flex h-full items-center justify-center text-gray-400">
-        Connecting...
-      </div>
-    );
-  }
-
-  if (!messages || messages.length === 0) {
+  if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-gray-400">
         No messages yet
