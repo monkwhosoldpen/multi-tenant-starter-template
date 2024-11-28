@@ -4,6 +4,7 @@ A minimalistic multi-tenant Next.js starter template with minimal setup and a mo
 
 [Demo](https://stack-template.vercel.app/)
 
+
 ## Landing Page
 
 <div align="center">
