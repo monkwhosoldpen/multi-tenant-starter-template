@@ -1,29 +1,27 @@
+"use client";
 import { useState, useEffect } from "react";
-import { Loader2, Trash2, Plus, ArrowLeft } from 'lucide-react';
+import { Loader2, Trash2, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { GoatCategory, generateMockGoat, generateAllMockData, generateMockSubgroup, generateMockGoatSync } from "@/lib/mockGoatsData";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Goat, Subgroup, Message } from "@/lib/types/goat";
+import { Goat, Subgroup, Message, SubgroupOrChannel } from "@/lib/types/goat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import useSuperAdmin from "@/lib/mock-provider";
 import { MessagesGrid } from "./goats/MessagesGrid";
 import { useRealtimeMessagesContext } from "@/lib/realtime-provider";
+import { RocketStatsModal } from "./RocketStatsModal";
+import { syncSubgroupWithRocket } from "@/lib/rocket-sync";
 
 // Mock categories for subgroups
 export const SUBGROUP_CATEGORIES = [
-  { id: 'official', name: 'Official' },
-  { id: 'twitter', name: 'Twitter' },
-  { id: 'facebook', name: 'Facebook' },
-  { id: 'men', name: 'Men' },
-  { id: 'women', name: 'Women' },
-  { id: 'entrepreneurs', name: 'Entrepreneurs' },
-  { id: 'football', name: 'Football' },
   { id: 'cricket', name: 'Cricket' },
-  { id: 'sports', name: 'Sports' },
-  { id: 'singing', name: 'Singing' },
-  { id: 'dancing', name: 'Dancing' },
+  { id: 'football', name: 'Football' },
+  { id: 'basketball', name: 'Basketball' },
+  { id: 'tennis', name: 'Tennis' },
+  { id: 'music', name: 'Music' },
+  { id: 'acting', name: 'Acting' },
 ];
 
 type ExtendedGoatCategory = GoatCategory | 'all';
@@ -42,7 +40,7 @@ const GoatsCrud: React.FC = () => {
   const [selectedSubgroupId, setSelectedSubgroupId] = useState<string>('');
   const [subgroups, setSubgroups] = useState<Subgroup[]>([]);
   const [isMessagesOpen, setIsMessagesOpen] = useState(false);
-  const [selectedSubgroup, setSelectedSubgroup] = useState<Subgroup | null>(null);
+  const [selectedSubgroup, setSelectedSubgroup] = useState<SubgroupOrChannel | null>(null);
   const [isSuperAdmin] = useState(true);
   const [bulkCreating, setBulkCreating] = useState(false);
   const [selectedSubgroupDetails, setSelectedSubgroupDetails] = useState<Subgroup | null>(null);
@@ -52,6 +50,9 @@ const GoatsCrud: React.FC = () => {
   const [messagesKey, setMessagesKey] = useState(0);
   const [creatingDemoGoats, setCreatingDemoGoats] = useState(false);
   const subgroupMessageCounts: Record<string, number> = {};
+  const [isRocketStatsOpen, setIsRocketStatsOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [rocketChannels, setRocketChannels] = useState<any[]>([]);
 
   const {
     fetchGoats,
@@ -112,43 +113,23 @@ const GoatsCrud: React.FC = () => {
   };
 
   const loadSubgroups = async (username: string) => {
-    const defaultSubgroups: Subgroup[] = [
-      {
-        username: 'public', 
-        verified: false,
-        metadata_with_translations: {
-          name: { english: 'Public' },
-          bio: { english: 'Public' }
-        },
-        img_url: '', cover_url: '',
-        category: 'public',
-        is_premium: false,
-        is_locked: false,
-        is_public: true,
-        is_realtime: false,
-        is_published: true,
-        owner_username: username,
-        is_secondary_stream: false,
-        is_party: false,
-        is_historical: false,
-        is_open: false,
-        is_demo: false,
-        tags: [],
-        entity_type: [],
-        blocked_profile_ids: [],
-        latest_message: null,
-        is_subgroup: true
-      },
-    ];
     try {
-      const { data, error } = await fetchSubgroups(username);
-      if (error) throw error;
-      setSubgroups([...defaultSubgroups, ...(data || [])]);
-
-      setSelectedSubgroupId(''); // Reset selected subgroup when goat changes
+      // Only fetch Rocket.Chat channels for ElonMusk
+      if (username.toLowerCase() === 'elonmusk') {
+        const response = await fetch(`/api/rocket/channels?username=${username}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch Rocket.Chat channels');
+        }
+        const data = await response.json();
+        console.log('Rocket.Chat channels:', data.channels);
+        setSubgroups(data.channels);
+      } else {
+        // For other users, return empty array
+        setSubgroups([]);
+      }
     } catch (err) {
       console.error('Error loading subgroups:', err);
-      setSubgroups([...defaultSubgroups]);
+      setSubgroups([]);
     }
   };
 
@@ -175,12 +156,28 @@ const GoatsCrud: React.FC = () => {
       for (const category of Object.keys(allData) as GoatCategory[]) {
         if (category !== 'demo') { // Skip demo category
           for (const goatData of allData[category].goats) {
-            const mockGoat = generateMockGoatSync(
-              goatData.username,
-              category
-            );
-            const { error } = await createGoat(mockGoat);
-            if (error) throw error;
+            // Create goat
+            const mockGoat = {
+              ...generateMockGoatSync(goatData.username, category),
+              uid: crypto.randomUUID(),
+            };
+            const { error: goatError } = await createGoat(mockGoat);
+            if (goatError) {
+              console.error(`Error creating goat ${goatData.username}:`, goatError);
+              continue;
+            }
+            console.log(`Created goat: ${goatData.username}`);
+
+            // Create subgroups for the goat
+            for (const { id: type } of SUBGROUP_CATEGORIES) {
+              const subgroup = generateMockSubgroup(goatData.username, type);
+              const { error: subgroupError } = await createSubgroup(subgroup);
+              if (subgroupError) {
+                console.error(`Error creating subgroup ${type} for ${goatData.username}:`, subgroupError);
+                continue;
+              }
+              console.log(`Created subgroup ${type} for ${goatData.username}`);
+            }
           }
         }
       }
@@ -195,24 +192,46 @@ const GoatsCrud: React.FC = () => {
   const handleCreateDemoGoats = async () => {
     setCreatingDemoGoats(true);
     try {
-      const allData = generateAllMockData();
-      const demoGoats = allData['demo'].goats;
+      // Create ElonMusk goat
+      const mockGoat = {
+        ...await generateMockGoat('ElonMusk', 'demo', supabase),
+        uid: crypto.randomUUID(),
+      };
 
-      for (const goatData of demoGoats) {
-        const mockGoat = await generateMockGoat(
-          goatData.username,
-          'demo',
-          supabase
-        );
-        const { error } = await createGoat(mockGoat);
-        if (error) throw error;
+      const { error: goatError } = await createGoat(mockGoat);
+      if (goatError) {
+        console.error('Error creating ElonMusk goat:', goatError);
+        return;
+      }
+      console.log('Created ElonMusk goat');
+
+      // Create Rocket.Chat channels
+      try {
+        const response = await fetch('/api/rocket/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ownerUsername: 'ElonMusk'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create Rocket.Chat channels');
+        }
+
+        const result = await response.json();
+        console.log('Created Rocket.Chat channels:', result);
+      } catch (error) {
+        console.error('Error creating Rocket.Chat channels:', error);
       }
 
       await loadGoats();
       setSelectedGoatCategory('demo');
       setSelectedGoatId('ElonMusk');
     } catch (error) {
-      console.error('Error creating demo goats:', error);
+      console.error('Error creating ElonMusk:', error);
     } finally {
       setCreatingDemoGoats(false);
     }
@@ -221,10 +240,29 @@ const GoatsCrud: React.FC = () => {
   const handleDeleteAllGoats = async () => {
     setDeletingAllGoats(true);
     try {
+      // First delete Rocket.Chat channels for ElonMusk
+      try {
+        const response = await fetch('/api/rocket/delete', {
+          method: 'POST'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to delete Rocket.Chat channels');
+        }
+        
+        const result = await response.json();
+        console.log('Deleted Rocket.Chat channels:', result.deletedChannels);
+      } catch (rocketError) {
+        console.error('Error deleting Rocket.Chat channels:', rocketError);
+      }
+
+      // Then delete all goats from Supabase
       const { error } = await clearAllGoats();
       if (error) throw error;
+      
       setGoats([]);
       setSelectedGoatId('');
+      setSubgroups([]);
     } catch (error) {
       console.error('Error deleting all goats:', error);
     } finally {
@@ -237,7 +275,11 @@ const GoatsCrud: React.FC = () => {
     setSelectedGoatId(goat.username);
     setIsMessagesOpen(false);
     setSelectedSubgroup(null);
-    loadSubgroups(goat.username);
+
+    // Only load subgroups for ElonMusk
+    if (goat.username.toLowerCase() === 'elonmusk') {
+      loadSubgroups(goat.username);
+    }
   };
 
   const filteredGoats = selectedGoatCategory === 'all'
@@ -273,10 +315,8 @@ const GoatsCrud: React.FC = () => {
     if (!ownerUsername) return;
     setBulkCreating(true);
     try {
-
-      // Step 1: Create all standard subgroups
+      // Create subgroups for each category
       for (const { id: type } of SUBGROUP_CATEGORIES) {
-
         const subgroup = generateMockSubgroup(ownerUsername, type);
         const { error } = await createSubgroup(subgroup);
         if (error) {
@@ -285,7 +325,7 @@ const GoatsCrud: React.FC = () => {
         }
       }
 
-      await loadSubgroups(ownerUsername); // Reload subgroups after creation
+      await loadSubgroups(ownerUsername);
     } catch (err) {
       console.error('Error bulk creating subgroups:', err);
     } finally {
@@ -339,6 +379,31 @@ const GoatsCrud: React.FC = () => {
       console.error('Error clearing messages:', err);
     } finally {
       setClearingMessages(false);
+    }
+  };
+
+  const handleResetAll = async () => {
+    setResetting(true);
+    try {
+      // First delete all Rocket.Chat data
+      const rocketResponse = await fetch('/api/rocket/delete', {
+        method: 'POST'
+      });
+      
+      if (!rocketResponse.ok) {
+        throw new Error('Failed to reset Rocket.Chat');
+      }
+      
+      console.log('Rocket.Chat reset successful');
+
+      // Then delete all goats
+      await handleDeleteAllGoats();
+      
+      console.log('Frontend reset successful');
+    } catch (error) {
+      console.error('Error during reset:', error);
+    } finally {
+      setResetting(false);
     }
   };
 
@@ -398,9 +463,9 @@ const GoatsCrud: React.FC = () => {
         {/* Goats List */}
         <ScrollArea className="flex-1 w-full px-1 md:px-2">
           <div className="space-y-1 md:space-y-2">
-            {goats.map((goat) => (
+            {goats.map((goat, index) => (
               <button
-                key={goat.username}
+                key={index}
                 onClick={() => handleGoatCardClick(goat)}
                 className="group relative w-10 h-10 md:w-12 md:h-12"
               >
@@ -426,19 +491,56 @@ const GoatsCrud: React.FC = () => {
 
         {/* Admin Actions */}
         {isSuperAdmin && hasGoats && (
-          <button
-            onClick={handleDeleteAllGoats}
-            disabled={deletingAllGoats}
-            className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white"
-          >
-            {deletingAllGoats ? (
-              <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-            ) : (
-              <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
-            )}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => setIsRocketStatsOpen(true)}
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center text-white"
+            >
+              <svg
+                className="h-4 w-4 md:h-5 md:w-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                />
+              </svg>
+            </button>
+            <button
+              onClick={handleResetAll}
+              disabled={resetting}
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-yellow-500 hover:bg-yellow-600 flex items-center justify-center text-white"
+            >
+              {resetting ? (
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3 md:h-4 md:w-4" />
+              )}
+            </button>
+            <button
+              onClick={handleDeleteAllGoats}
+              disabled={deletingAllGoats}
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-red-500 hover:bg-red-600 flex items-center justify-center text-white"
+            >
+              {deletingAllGoats ? (
+                <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
+              ) : (
+                <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+              )}
+            </button>
+          </div>
         )}
       </div>
+
+      {/* Add the modal */}
+      <RocketStatsModal 
+        open={isRocketStatsOpen} 
+        onOpenChange={setIsRocketStatsOpen}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 relative">
@@ -498,11 +600,12 @@ const GoatsCrud: React.FC = () => {
               {/* Subgroups Grid with ScrollArea */}
               <ScrollArea className="flex-1 p-2 md:p-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2 md:gap-3">
-                  {subgroups.map((subgroup: Subgroup) => (
+                  {subgroups.map((subgroup: any, index: number) => (
                     <Card
-                      key={subgroup.username}
-                      className={`cursor-pointer hover:shadow-md transition-shadow ${subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
-                        } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
+                      key={index}
+                      className={`cursor-pointer hover:shadow-md transition-shadow ${
+                        subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
+                      } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
                       onClick={() => {
                         setSelectedSubgroupDetails(subgroup);
                         setSelectedSubgroup(subgroup);
@@ -514,22 +617,18 @@ const GoatsCrud: React.FC = () => {
                           <div className="flex-1 truncate">
                             <div className="flex items-center gap-2">
                               <h3 className="font-medium text-xs md:text-sm truncate">
-                                {subgroup.metadata_with_translations.name.english}
+                                {subgroup.name || subgroup.metadata_with_translations?.name?.english}
                               </h3>
                               <Badge
                                 variant="secondary"
-                                className={`h-5 min-w-[20px] px-1 flex items-center justify-center ${
-                                  subgroupMessageCounts[subgroup.username] > 0 
-                                    ? 'bg-indigo-500 text-white' 
-                                    : 'bg-gray-200 text-gray-500'
-                                }`}
+                                className="h-5 min-w-[20px] px-1 flex items-center justify-center bg-gray-200 text-gray-500"
                               >
-                                {subgroupMessageCounts[subgroup.username] || 0}
+                                {subgroup.messagesCount || 0}
                               </Badge>
                             </div>
                           </div>
                           <Badge variant="outline" className="text-[10px] md:text-xs">
-                            {subgroup.is_realtime ? 'Realtime' : 'Static'}
+                            {subgroup.t === 'c' ? 'Channel' : 'Group'}
                           </Badge>
                         </div>
                       </CardHeader>
@@ -563,7 +662,11 @@ const GoatsCrud: React.FC = () => {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
               <h2 className="text-lg font-semibold text-gray-100">
-                {selectedSubgroup?.metadata_with_translations.name.english}
+                {selectedSubgroup 
+                  ? ('name' in selectedSubgroup 
+                      ? selectedSubgroup.name 
+                      : selectedSubgroup.metadata_with_translations?.name?.english)
+                  : 'Channel'}
               </h2>
             </div>
 

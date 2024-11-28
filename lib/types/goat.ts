@@ -8,6 +8,7 @@ export interface Message {
 }
 
 export interface Subgroup {
+    stream_id?: any;
     username: string;
     verified: boolean;
     metadata_with_translations: {
@@ -42,6 +43,16 @@ export interface Subgroup {
     latest_message: Message | null;
     is_subgroup: boolean;
 }
+
+export interface RocketChannel {
+    _id: string;
+    name: string;
+    messagesCount: number;
+    lastMessage: any;
+    t: string; // channel type ('c' for channel)
+}
+
+export type SubgroupOrChannel = Subgroup | RocketChannel | any;
 
 export interface Goat {
     uid: string;

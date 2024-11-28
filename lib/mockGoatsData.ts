@@ -1,6 +1,5 @@
 import { Message, Subgroup, Goat, GoatCategoryData } from './types/goat';
 import { v4 as uuidv4 } from 'uuid';
-import { SUBGROUP_CATEGORIES } from '@/components/GoatsCRUD';
 
 export const GoatCategories = {
     demo: [
@@ -14,13 +13,6 @@ export const GoatCategories = {
         "MarkZuckerberg",
         "JeffBezos",
         "SteveJobs"
-    ],
-    cricket: [
-        "SachinTendulkar",
-        "ViratKohli",
-        "SteveSmith",
-        "BenStokes",
-        "KaneWilliamson"
     ],
     football: [
         "CristianoRonaldo",
@@ -167,46 +159,24 @@ export const generateMockGoatSync = (username: string, category: string): Goat =
 };
 
 // Async version for actual creation with subgroups and messages
-export const generateMockGoat = async (username: string, category: string, supabase: any): Promise<Goat> => {
-    // Step 1: Create the goat
-    const goat = generateMockGoatSync(username, category);
-
-    const { data: goatData, error: goatError } = await supabase
-        .from("user_profiles")
-        .upsert([goat], {
-            onConflict: 'uid',
-        })
-        .select()
-        .single();
-
-    if (goatError) {
-        console.error('Error creating goat:', goatError);
-        throw goatError;
-    }
-
-    // Step 3: Create standard subgroups from SUBGROUP_CATEGORIES
-    const createdSubgroups = []; // Include public subgroup in the list
-
-    for (const { id: type } of SUBGROUP_CATEGORIES) {
-        const subgroup = generateMockSubgroup(username, type);
-
-        const { data: subgroupData, error: subgroupError } = await supabase
-            .from("sub_groups")
-            .insert([{
-                ...subgroup,
-                is_published: true
-            }])
-            .select()
-            .single();
-
-        if (subgroupError) {
-            console.error(`Error creating subgroup ${type}:`, subgroupError);
-            continue;
-        }
-
-        createdSubgroups.push(subgroupData);
-    }
-    return goat;
+export const generateMockGoat = async (username: string, category: GoatCategory, supabase: any): Promise<any> => {
+    return {
+        uid: crypto.randomUUID(),
+        username: username,
+        verified: true,
+        metadata_with_translations: {
+            name: { english: username },
+            bio: { english: `This is ${username}'s profile` }
+        },
+        img_url: '',
+        cover_url: '',
+        category: category,
+        is_premium: false,
+        tags: [],
+        entity_type: [],
+        blocked_profile_ids: [],
+        latest_message: null
+    };
 };
 
 export const generateMockGoatCategory = (category: GoatCategory): GoatCategoryData => {
@@ -229,7 +199,6 @@ export const generateAllMockData = () => {
         { category: 'demo' as GoatCategory, username: 'JohnDoe' },
         // Other categories
         { category: 'technology' as GoatCategory, username: 'BillGates' },
-        { category: 'cricket' as GoatCategory, username: 'SachinTendulkar' },
         { category: 'football' as GoatCategory, username: 'CristianoRonaldo' },
         { category: 'basketball' as GoatCategory, username: 'MichaelJordan' },
         { category: 'tennis' as GoatCategory, username: 'RogerFederer' },

@@ -50,16 +50,6 @@ export const influencerMockData = {
       },
       // ... more celebrities
     ],
-    sports: [
-      {
-        name: "M.S. Raju",
-        sport: "Cricket",
-        influence: "medium",
-        local_connect: "Born in constituency",
-        availability: "selective",
-      },
-      // ... more sports personalities
-    ],
   },
   social_media: {
     influencers: [
