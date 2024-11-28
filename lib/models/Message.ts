@@ -2,43 +2,62 @@ import { Model } from '@nozbe/watermelondb';
 
 export class Message extends Model {
   static table = 'messages';
-  static associations = {};
+  static associations = {
+    channels: { type: 'belongs_to', key: 'channel_id' }
+  };
 
-  // Define getters for each field
-  get _id() {
-    return this.getField('_id');
+  getValue(key: string): any {
+    return (this as any)[key];
   }
 
-  get msg() {
-    return this.getField('msg');
+  setValue(key: string, value: any): void {
+    (this as any)[key] = value;
   }
 
-  get rid() {
-    return this.getField('rid');
+  get msg(): string {
+    return this.getValue('msg');
   }
 
-  get userId() {
-    return this.getField('user_id');
+  get rid(): string {
+    return this.getValue('rid');
   }
 
-  get username() {
-    return this.getField('username');
+  get userId(): string {
+    return this.getValue('user_id');
   }
 
-  get userName() {
-    return this.getField('user_name');
+  get username(): string {
+    return this.getValue('username');
   }
 
-  get createdAt() {
-    return this.getField('created_at');
+  get userName(): string {
+    return this.getValue('user_name');
   }
 
-  get updatedAt() {
-    return this.getField('updated_at');
+  get channelId(): string {
+    return this.getValue('channel_id');
   }
 
-  // Helper method to get field value
-  private getField(fieldName: string) {
-    return this.valueOf(fieldName);
+  get createdAt(): number {
+    return this.getValue('created_at');
+  }
+
+  get updatedAt(): number {
+    return this.getValue('updated_at');
+  }
+
+  prepareUpdate(changes: Partial<{
+    msg: string;
+    rid: string;
+    user_id: string;
+    username: string;
+    user_name: string;
+    channel_id: string;
+    created_at: number;
+    updated_at: number;
+  }>): void {
+    Object.entries(changes).forEach(([key, value]) => {
+      this.setValue(key, value);
+    });
   }
 } 

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Loader2, Trash2, Plus, ArrowLeft, RefreshCw } from 'lucide-react';
 import { GoatCategory, generateMockGoat, generateAllMockData, generateMockSubgroup, generateMockGoatSync } from "@/lib/mockGoatsData";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { MessagesGrid } from "./goats/MessagesGrid";
 import { useRealtimeMessagesContext } from "@/lib/realtime-provider";
 import { RocketStatsModal } from "./RocketStatsModal";
 import { syncSubgroupWithRocket } from "@/lib/rocket-sync";
+import { OfflineContext, useOfflineContext } from '@/lib/offline-provider';
 
 // Mock categories for subgroups
 export const SUBGROUP_CATEGORIES = [
@@ -66,6 +67,11 @@ const GoatsCrud: React.FC = () => {
     deleteMessages
   } = useSuperAdmin();
 
+  const {
+    loadChannelsFromDb,
+    saveChannelToDb
+  } = useOfflineContext();
+
   useEffect(() => {
     loadGoats();
   }, []);
@@ -116,38 +122,44 @@ const GoatsCrud: React.FC = () => {
     console.log('🔄 Loading subgroups for:', username);
     try {
       if (username.toLowerCase() === 'elonmusk') {
+        // First check local cache
+        const cachedChannels = await loadChannelsFromDb(username);
+        if (cachedChannels.length > 0) {
+          console.log('📦 Using cached channels:', cachedChannels.length);
+          setSubgroups(cachedChannels);
+          return;
+        }
+
+        // If no cache, fetch from API
         const response = await fetch(`/api/rocket/channels?username=${username}`);
         if (!response.ok) {
           throw new Error('Failed to fetch Rocket.Chat channels');
         }
-        const data = await response.json();
         
+        const data = await response.json();
         if (!data.success) {
           throw new Error(data.error || 'Failed to fetch channels');
         }
         
         console.log('📦 Loaded Rocket.Chat channels:', data.channels);
         
-        // Transform channels to match your subgroup interface
-        const transformedChannels = data.channels.map((channel: any) => ({
-          _id: channel._id,
-          name: channel.name,
-          t: channel.t,
-          username: 'ElonMusk',
-          description: channel.description || '',
-          metadata_with_translations: {
-            name: { english: channel.name },
-            bio: { english: channel.description || '' }
+        // Save channels to local DB sequentially to avoid batch issues
+        for (const channel of data.channels) {
+          try {
+            await saveChannelToDb(channel);
+          } catch (err) {
+            console.warn('Warning: Failed to cache channel:', channel.name, err);
+            // Continue with other channels even if one fails to cache
           }
-        }));
+        }
         
-        setSubgroups(transformedChannels);
+        setSubgroups(data.channels);
       } else {
         setSubgroups([]);
       }
     } catch (error) {
       console.error('❌ Error loading subgroups:', error);
-      setSubgroups([]);
+      setSubgroups([]); // Reset to empty state on error
     }
   };
 
