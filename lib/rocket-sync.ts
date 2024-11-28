@@ -1,39 +1,24 @@
 import { Subgroup } from './types/goat';
 
-export async function syncSubgroupWithRocket(ownerUsername: string, subgroup: Subgroup) {
-//   if (ownerUsername.toLowerCase() !== 'elonmusk') {
-//     console.log('Skipping Rocket.Chat sync for non-ElonMusk user');
-//     return null;
-//   }
-
+export const syncSubgroupWithRocket = async (subgroup: Subgroup) => {
   try {
-    console.log(`Creating Rocket.Chat channel via API route: ${ownerUsername}_${subgroup.category}`);
-    const response = await fetch('/api/rocket/create', {
+    const response = await fetch('/api/rocket/sync-channel', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        ownerUsername,
-        category: {
-          id: subgroup.category,
-          name: subgroup.metadata_with_translations.name.english
-        }
-      })
+      body: JSON.stringify(subgroup),
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.details || 'Failed to create channel');
+      throw new Error(`Failed to sync channel: ${response.statusText}`);
     }
 
     const data = await response.json();
-    console.log(`Successfully created Rocket.Chat channel:`, data);
-    
-    // Return the first channel's ID from the created channels
-    return data.createdChannels[0]?.channelId;
-  } catch (err) {
-    console.error(`Error syncing with Rocket.Chat:`, err);
-    throw err;
+    console.log('✅ Channel synced successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ Error syncing channel:', error);
+    throw error;
   }
-} 
+}; 

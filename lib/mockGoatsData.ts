@@ -191,38 +191,55 @@ export const generateMockGoatCategory = (category: GoatCategory): GoatCategoryDa
 };
 
 export const generateAllMockData = () => {
-    // Always include demo goats and other selected goats
-    const allGoats = [
-        // Demo category goats
-        { category: 'demo' as GoatCategory, username: 'ElonMusk' },
-        { category: 'demo' as GoatCategory, username: 'JaneDoe' },
-        { category: 'demo' as GoatCategory, username: 'JohnDoe' },
-        // Other categories
-        { category: 'technology' as GoatCategory, username: 'BillGates' },
-        { category: 'football' as GoatCategory, username: 'CristianoRonaldo' },
-        { category: 'basketball' as GoatCategory, username: 'MichaelJordan' },
-        { category: 'tennis' as GoatCategory, username: 'RogerFederer' },
-        { category: 'music' as GoatCategory, username: 'MichaelJackson' },
-        { category: 'acting' as GoatCategory, username: 'TomHanks' },
-        { category: 'science' as GoatCategory, username: 'AlbertEinstein' },
-        { category: 'technology' as GoatCategory, username: 'MarkZuckerberg' }
-    ];
-
-    // Create a map to store goats by category
-    const categorizedGoats = allGoats.reduce((acc, { category, username }) => {
-        if (!acc[category]) {
-            acc[category] = {
-                id: category,
-                name: category.charAt(0).toUpperCase() + category.slice(1),
-                description: category === 'demo' ?
-                    'Demo profiles for testing purposes' :
-                    `Collection of ${category} personalities`,
-                goats: []
-            };
+    // Create subgroups that will become Rocket.Chat channels
+    const subgroups = [
+        {
+            name: 'spacex-updates',  // Changed to lowercase with hyphens
+            type: 'p',  // private channel
+            description: 'Latest updates from SpaceX',
+            members: ['ElonMusk'],
+            readOnly: false,
+            extraData: {
+                broadcast: false,
+                encrypted: false,
+                teamId: null,
+                teamMain: false
+            }
+        },
+        {
+            name: 'tesla-news',  // Changed to lowercase with hyphens
+            type: 'p',
+            description: 'Tesla company news and updates',
+            members: ['ElonMusk'],
+            readOnly: false,
+            extraData: {
+                broadcast: false,
+                encrypted: false,
+                teamId: null,
+                teamMain: false
+            }
+        },
+        {
+            name: 'twitter-x',  // Changed to lowercase with hyphens
+            type: 'p',
+            description: 'Discussions about Twitter/X platform',
+            members: ['ElonMusk'],
+            readOnly: false,
+            extraData: {
+                broadcast: false,
+                encrypted: false,
+                teamId: null,
+                teamMain: false
+            }
         }
-        acc[category].goats.push(generateMockGoatSync(username, category));
-        return acc;
-    }, {} as Record<GoatCategory, GoatCategoryData>);
+    ].map(subgroup => ({
+        ...subgroup,
+        id: crypto.randomUUID(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+    }));
 
-    return categorizedGoats;
+    return {
+        subgroups
+    };
 };

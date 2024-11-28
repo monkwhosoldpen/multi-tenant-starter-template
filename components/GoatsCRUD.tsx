@@ -113,125 +113,115 @@ const GoatsCrud: React.FC = () => {
   };
 
   const loadSubgroups = async (username: string) => {
+    console.log('🔄 Loading subgroups for:', username);
     try {
-      // Only fetch Rocket.Chat channels for ElonMusk
       if (username.toLowerCase() === 'elonmusk') {
         const response = await fetch(`/api/rocket/channels?username=${username}`);
         if (!response.ok) {
           throw new Error('Failed to fetch Rocket.Chat channels');
         }
         const data = await response.json();
-        console.log('Rocket.Chat channels:', data.channels);
-        setSubgroups(data.channels);
+        
+        if (!data.success) {
+          throw new Error(data.error || 'Failed to fetch channels');
+        }
+        
+        console.log('📦 Loaded Rocket.Chat channels:', data.channels);
+        
+        // Transform channels to match your subgroup interface
+        const transformedChannels = data.channels.map((channel: any) => ({
+          _id: channel._id,
+          name: channel.name,
+          t: channel.t,
+          username: 'ElonMusk',
+          description: channel.description || '',
+          metadata_with_translations: {
+            name: { english: channel.name },
+            bio: { english: channel.description || '' }
+          }
+        }));
+        
+        setSubgroups(transformedChannels);
       } else {
-        // For other users, return empty array
         setSubgroups([]);
       }
-    } catch (err) {
-      console.error('Error loading subgroups:', err);
+    } catch (error) {
+      console.error('❌ Error loading subgroups:', error);
       setSubgroups([]);
     }
   };
 
-  const handleCreateElonMusk = async () => {
-    setCreatingElonMusk(true);
-    try {
-      const mockElonMusk = await generateMockGoat('ElonMusk', 'technology', supabase);
-      const { error } = await createGoat(mockElonMusk);
-      if (error) throw error;
-      await loadGoats();
-      setSelectedGoatCategory('technology');
-      setSelectedGoatId('ElonMusk');
-    } catch (error) {
-      console.error('Error creating Elon Musk profile:', error);
-    } finally {
-      setCreatingElonMusk(false);
-    }
-  };
-
-  const handleCreateAllGoats = async () => {
-    setCreatingAllGoats(true);
-    try {
-      const allData = generateAllMockData();
-      for (const category of Object.keys(allData) as GoatCategory[]) {
-        if (category !== 'demo') { // Skip demo category
-          for (const goatData of allData[category].goats) {
-            // Create goat
-            const mockGoat = {
-              ...generateMockGoatSync(goatData.username, category),
-              uid: crypto.randomUUID(),
-            };
-            const { error: goatError } = await createGoat(mockGoat);
-            if (goatError) {
-              console.error(`Error creating goat ${goatData.username}:`, goatError);
-              continue;
-            }
-            console.log(`Created goat: ${goatData.username}`);
-
-            // Create subgroups for the goat
-            for (const { id: type } of SUBGROUP_CATEGORIES) {
-              const subgroup = generateMockSubgroup(goatData.username, type);
-              const { error: subgroupError } = await createSubgroup(subgroup);
-              if (subgroupError) {
-                console.error(`Error creating subgroup ${type} for ${goatData.username}:`, subgroupError);
-                continue;
-              }
-              console.log(`Created subgroup ${type} for ${goatData.username}`);
-            }
-          }
-        }
-      }
-      await loadGoats();
-    } catch (error) {
-      console.error('Error creating all goats:', error);
-    } finally {
-      setCreatingAllGoats(false);
-    }
-  };
-
-  const handleCreateDemoGoats = async () => {
+  const resetAndSetupGoat = async () => {
     setCreatingDemoGoats(true);
     try {
-      // Create ElonMusk goat
-      const mockGoat = {
-        ...await generateMockGoat('ElonMusk', 'demo', supabase),
+      console.log('🔄 Starting complete goat setup process...');
+
+      // Step 1: Clear existing data
+      console.log('🧹 Clearing existing data...');
+      await clearAllGoats();
+      
+      const deleteResponse = await fetch('/api/rocket/delete', {
+        method: 'POST'
+      });
+      
+      if (!deleteResponse.ok) {
+        throw new Error('Failed to delete Rocket.Chat channels');
+      }
+      
+      const deleteResult = await deleteResponse.json();
+      console.log('🗑️ Deleted Rocket.Chat channels:', deleteResult.deletedChannels);
+
+      // Wait for cleanup
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Step 2: Create Elon Musk profile in Supabase
+      console.log('👤 Creating Elon Musk profile...');
+      const mockElonMusk = {
         uid: crypto.randomUUID(),
+        username: 'ElonMusk',
+        category: 'technology',
+        verified: true,
+        metadata_with_translations: {
+          name: { english: 'Elon Musk' },
+          bio: { english: 'CEO of Tesla, SpaceX, and X' }
+        },
+        img_url: 'https://placehold.co/150/808080/000000?text=ElonMusk',
+        cover_url: 'https://placehold.co/600x200/808080/000000?text=ElonMusk'
       };
 
-      const { error: goatError } = await createGoat(mockGoat);
-      if (goatError) {
-        console.error('Error creating ElonMusk goat:', goatError);
-        return;
-      }
-      console.log('Created ElonMusk goat');
+      const { error: goatError } = await createGoat(mockElonMusk);
+      if (goatError) throw goatError;
 
-      // Create Rocket.Chat channels
-      try {
-        const response = await fetch('/api/rocket/create', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            ownerUsername: 'ElonMusk'
-          })
-        });
+      console.log('✅ Elon Musk profile created successfully');
 
-        if (!response.ok) {
-          throw new Error('Failed to create Rocket.Chat channels');
-        }
+      // Step 3: Create Rocket.Chat channels
+      console.log('🎯 Generating channel data...');
+      const mockData = generateAllMockData();
+      console.log('📦 Generated channel data:', mockData);
 
-        const result = await response.json();
-        console.log('Created Rocket.Chat channels:', result);
-      } catch (error) {
-        console.error('Error creating Rocket.Chat channels:', error);
+      console.log('📁 Creating channels:', mockData.subgroups.length);
+      for (const subgroup of mockData.subgroups) {
+        console.log('📂 Creating channel:', subgroup.name);
+        await syncSubgroupWithRocket(subgroup);
+        // Wait between channel creations
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
+      // Step 4: Refresh data and select Elon Musk
+      console.log('🔄 Refreshing data...');
       await loadGoats();
-      setSelectedGoatCategory('demo');
+      
+      console.log('🎯 Selecting Elon Musk profile');
+      setSelectedGoatCategory('technology');
       setSelectedGoatId('ElonMusk');
+      
+      console.log('📂 Loading channels...');
+      await loadSubgroups('ElonMusk');
+
+      console.log('✅ Complete goat setup process finished successfully');
+
     } catch (error) {
-      console.error('Error creating ElonMusk:', error);
+      console.error('❌ Error in goat setup process:', error);
     } finally {
       setCreatingDemoGoats(false);
     }
@@ -422,32 +412,20 @@ const GoatsCrud: React.FC = () => {
           <div className="flex flex-col gap-4 items-center">
             <h2 className="text-xl font-semibold mb-4">No Goats Available</h2>
             <Button
-              onClick={handleCreateDemoGoats}
+              onClick={resetAndSetupGoat}
               disabled={creatingDemoGoats}
               className="w-full max-w-md"
             >
               {creatingDemoGoats ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Demo Goats...
+                  Setting up...
                 </>
               ) : (
-                'Create Demo Goats'
-              )}
-            </Button>
-            <Button
-              onClick={handleCreateAllGoats}
-              disabled={creatingAllGoats}
-              variant="outline"
-              className="w-full max-w-md"
-            >
-              {creatingAllGoats ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating All Goats...
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Reset & Setup
                 </>
-              ) : (
-                'Create All Goats'
               )}
             </Button>
           </div>

@@ -50,11 +50,29 @@ export function MessagesGrid({ subgroup }: MessagesGridProps) {
     );
   }
 
+  // Remove duplicate messages
+  const uniqueMessages = messages.reduce((acc, current) => {
+    const x = acc.find(item => item._id === current._id);
+    if (!x) {
+      return acc.concat([current]);
+    } else {
+      return acc;
+    }
+  }, [] as typeof messages);
+
+  // Sort messages by timestamp
+  const sortedMessages = [...uniqueMessages].sort((a, b) => 
+    new Date(a.ts).getTime() - new Date(b.ts).getTime()
+  );
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="space-y-4 p-4">
-        {messages.map((message) => (
-          <div key={message._id} className="group rounded p-2 hover:bg-[#2e3035]">
+        {sortedMessages.map((message) => (
+          <div 
+            key={`${message._id}-${message.ts}`} 
+            className="group rounded p-2 hover:bg-[#2e3035]"
+          >
             <div className="flex items-center gap-2">
               <span className="font-medium text-gray-100">{message.u.name}</span>
               <span className="text-xs text-gray-400">
