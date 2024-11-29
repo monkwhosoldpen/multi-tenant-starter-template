@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import useSuperAdmin from "@/lib/mock-provider";
-import { MessagesGrid } from "./goats/MessagesGrid";
+import { MessagesGrid } from "./chat/MessagesGrid";
 import { useRealtimeContext } from "@/lib/realtime-provider";
 import { RocketStatsModal } from "./RocketStatsModal";
 import { syncSubgroupWithRocket } from "@/lib/rocket-sync";
@@ -27,7 +27,7 @@ export const SUBGROUP_CATEGORIES: any = [
 
 type ExtendedGoatCategory = GoatCategory | 'all';
 
-const Whatsapp: React.FC = () => {
+const GoatsCrud: React.FC = () => {
   const [selectedGoatCategory, setSelectedGoatCategory] = useState<ExtendedGoatCategory>('all');
   const [selectedGoatId, setSelectedGoatId] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('official');
@@ -630,7 +630,7 @@ const Whatsapp: React.FC = () => {
           )}
         </div>
 
-        {/* Messages Area - Whatsapp Style */}
+        {/* Messages Area - Discord Style */}
         <div className={`absolute inset-0 bg-[#313338] transition-transform duration-300 ${isMessagesOpen ? 'translate-x-0' : 'translate-x-[100%]'
           }`}>
           {/* Header with back button, name, and actions */}
@@ -706,4 +706,4 @@ const Whatsapp: React.FC = () => {
   );
 };
 
-export default Whatsapp;
+export default GoatsCrud;

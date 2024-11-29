@@ -1,5 +1,5 @@
 "use client";
-import { MessagesGrid } from "@/components/goats/MessagesGrid";
+import { MessagesGrid } from "@/components/chat/MessagesGrid";
 import { useEffect, useState } from "react";
 import { SubgroupOrChannel } from "@/lib/types/goat";
 import { useOfflineContext } from "@/lib/offline-provider";
