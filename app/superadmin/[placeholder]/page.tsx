@@ -9,11 +9,9 @@ export default function Page({
   params: { placeholder: string; teamId: string };
 }) {
   return (
-    <SuperadminProvider>
-      <RealtimeProvider>
-        <GoatsCrud />
-      </RealtimeProvider>
-    </SuperadminProvider>
+    <div className="h-[calc(100vh-5rem)] py-20">
+      <GoatsCrud />
+    </div>
   )
 }
 

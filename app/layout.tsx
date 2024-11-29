@@ -6,6 +6,7 @@ import "./globals.css";
 import { Provider } from "./provider";
 import { SuperadminProvider } from "@/lib/mock-provider";
 import { RealtimeProvider } from "@/lib/realtime-provider";
+import { OfflineProvider } from "@/lib/offline-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,17 +23,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <Provider>
-          <StackProvider app={stackServerApp}>
-            <SuperadminProvider>
-              <RealtimeProvider>
-                <StackTheme theme={{ dark: { background: '#171717' } }}>
-                  {children}
-                </StackTheme>
-              </RealtimeProvider>
-            </SuperadminProvider>
-          </StackProvider>
-        </Provider>
+        <OfflineProvider disableOffline={false}>
+          <RealtimeProvider>
+            <Provider>
+              <StackProvider app={stackServerApp}>
+                <SuperadminProvider>
+                  <StackTheme theme={{ dark: { background: '#171717' } }}>
+                    {children}
+                  </StackTheme>
+                </SuperadminProvider>
+              </StackProvider>
+            </Provider>
+          </RealtimeProvider>
+        </OfflineProvider>
       </body>
     </html>
   );

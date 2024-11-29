@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRealtimeContext } from '@/lib/realtime-provider';
 import { SubgroupOrChannel } from '@/lib/types/goat';
 import { useOfflineContext } from '@/lib/offline-provider';
@@ -10,28 +10,65 @@ interface MessagesGridProps {
 }
 
 export const MessagesGrid = ({ subgroup }: MessagesGridProps) => {
-  const { messages, subscribeToChannel, unsubscribeFromChannel } = useRealtimeContext();
-  const { loadMessagesFromDb } = useOfflineContext();
+  const { messages, subscribeToChannel, unsubscribeFromChannel, wsStatus } = useRealtimeContext();
+  const { loadMessagesFromDb, isOfflineDisabled } = useOfflineContext();
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
     const channelId = 'rid' in subgroup ? subgroup.rid : subgroup._id;
+    setIsLoading(true);
     
-    // First try to load from local DB
-    loadMessagesFromDb(channelId).then(cachedMessages => {
-      if (cachedMessages && cachedMessages.length > 0) {
-        console.log('📦 Using cached messages:', cachedMessages.length);
-        // Handle cached messages
+    const loadMessages = async () => {
+      try {
+        // Only try loading from DB if offline is enabled
+        if (!isOfflineDisabled) {
+          const cachedMessages = await loadMessagesFromDb(channelId);
+          if (cachedMessages && cachedMessages.length > 0) {
+            console.log('📦 Using cached messages:', cachedMessages.length);
+          }
+        }
+
+        // Subscribe to real-time updates
+        await subscribeToChannel(channelId, (message) => {
+          // Handle real-time updates
+        });
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      } finally {
+        setIsLoading(false);
       }
-    });
-    // Then subscribe to real-time updates
-    subscribeToChannel(channelId, (message) => {
-      // Handle real-time updates
-    });
+    };
+
+    loadMessages();
     
     return () => {
       unsubscribeFromChannel(channelId);
     };
-  }, [subgroup, subscribeToChannel, unsubscribeFromChannel, loadMessagesFromDb]);
+  }, [subgroup, subscribeToChannel, unsubscribeFromChannel, loadMessagesFromDb, isOfflineDisabled]);
+
+  if (isLoading || wsStatus === 'connecting') {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gray-200"></div>
+          <p className="text-sm text-gray-400">
+            {wsStatus === 'connecting' ? 'Connecting...' : 'Loading messages...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (wsStatus === 'disconnected') {
+    return (
+      <div className="flex h-full items-center justify-center text-gray-400">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-red-400">⚠️</span>
+          <p>Connection lost. Trying to reconnect...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (messages.length === 0) {
     return (

@@ -54,6 +54,7 @@ type OfflineContextType = {
   saveChannelToDb: (channel: any) => Promise<void>;
   loadChannelsFromDb: (username: string) => Promise<any[]>;
   clearChannelsFromDb: (username: string) => Promise<void>;
+  isOfflineDisabled: boolean;
 };
 
 export const OfflineContext = createContext<OfflineContextType | null>(null);
@@ -66,7 +67,15 @@ export const useOfflineContext = () => {
   return context;
 };
 
-export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+interface OfflineProviderProps {
+  children: ReactNode;
+  disableOffline?: boolean;
+}
+
+export const OfflineProvider: React.FC<OfflineProviderProps> = ({ 
+  children, 
+  disableOffline = true
+}) => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -110,6 +119,7 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   const saveMessageToDb = useCallback(async (message: RocketMessage) => {
+    if (disableOffline) return;
     try {
       const db = ensureDatabase();
       await db.write(async () => {
@@ -130,9 +140,10 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch (error) {
       console.error('Error saving message to local DB:', error);
     }
-  }, []);
+  }, [disableOffline]);
 
   const loadMessagesFromDb = useCallback(async (channelId: string) => {
+    if (disableOffline) return null;
     try {
       const db = ensureDatabase();
       const messageCollection = db.get<Message>('messages');
@@ -156,9 +167,10 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.error('Error loading messages from DB:', error);
       return null;
     }
-  }, []);
+  }, [disableOffline]);
 
   const saveChannelToDb = useCallback(async (channel: any) => {
+    if (disableOffline) return;
     try {
       const db = ensureDatabase();
       const channelsCollection = db.get<Channel>('channels');
@@ -179,9 +191,10 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.error('Error saving channel to DB:', error);
       throw error;
     }
-  }, []);
+  }, [disableOffline]);
 
   const loadChannelsFromDb = useCallback(async (username: string) => {
+    if (disableOffline) return [];
     try {
       const db = ensureDatabase();
       const channelsCollection = db.get<Channel>('channels');
@@ -202,7 +215,7 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
       console.error('Error loading channels from DB:', error);
       return [];
     }
-  }, []);
+  }, [disableOffline]);
 
   const clearChannelsFromDb = useCallback(async (username: string) => {
     try {
@@ -228,7 +241,8 @@ export const OfflineProvider: React.FC<{ children: ReactNode }> = ({ children })
     loadMessagesFromDb,
     saveChannelToDb,
     loadChannelsFromDb,
-    clearChannelsFromDb
+    clearChannelsFromDb,
+    isOfflineDisabled: disableOffline
   };
 
   return (
