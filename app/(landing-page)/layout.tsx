@@ -9,7 +9,7 @@ export default function Layout(props: { children: React.ReactNode }) {
           { title: "Home", href: "/" },
           { title: "Features", href: "/#features" },
           { title: "Pricing", href: "/#pricing" },
-          { title: "SuperAdmin", href: "/superadmin" },
+          { title: "Whatsapp", href: "/whatsapp" },
         ]}
       />
       <main className="flex-1">{props.children}</main>

@@ -32,7 +32,7 @@ export default async function IndexPage() {
         primaryCtaText="Get Started"
         primaryCtaLink={stackServerApp.urls.signUp}
         secondaryCtaText="Start"
-        secondaryCtaLink="/superadmin/discord"
+        secondaryCtaLink="/whatsapp"
         credits={
           <>
             Crafted with ❤️ by{" "}

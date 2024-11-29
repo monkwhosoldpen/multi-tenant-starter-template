@@ -27,7 +27,7 @@ export const SUBGROUP_CATEGORIES: any = [
 
 type ExtendedGoatCategory = GoatCategory | 'all';
 
-const GoatsCrud: React.FC = () => {
+const Whatsapp: React.FC = () => {
   const [selectedGoatCategory, setSelectedGoatCategory] = useState<ExtendedGoatCategory>('all');
   const [selectedGoatId, setSelectedGoatId] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('official');
@@ -50,18 +50,15 @@ const GoatsCrud: React.FC = () => {
   const [clearingMessages, setClearingMessages] = useState(false);
   const [messagesKey, setMessagesKey] = useState(0);
   const [creatingDemoGoats, setCreatingDemoGoats] = useState(false);
-  const subgroupMessageCounts: Record<string, number> = {};
   const [isRocketStatsOpen, setIsRocketStatsOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [rocketChannels, setRocketChannels] = useState<any[]>([]);
+  const [isLoadingChannels, setIsLoadingChannels] = useState(false);
 
   const {
     fetchGoats,
     createGoat,
     clearAllGoats,
-    supabase,
-    fetchSubgroups,
-    createSubgroup,
     clearAllSubgroups,
     createBulkMessages,
     deleteMessages
@@ -120,6 +117,7 @@ const GoatsCrud: React.FC = () => {
 
   const loadSubgroups = async (username: string) => {
     console.log('🔄 Loading subgroups for:', username);
+    setIsLoadingChannels(true);
     try {
       if (username.toLowerCase() === 'elonmusk') {
         // First check local cache
@@ -159,6 +157,8 @@ const GoatsCrud: React.FC = () => {
     } catch (error) {
       console.error('❌ Error loading subgroups:', error);
       setSubgroups([]); // Reset to empty state on error
+    } finally {
+      setIsLoadingChannels(false);
     }
   };
 
@@ -276,20 +276,10 @@ const GoatsCrud: React.FC = () => {
     }
   };
 
-  const filteredGoats = selectedGoatCategory === 'all'
-    ? goats
-    : goats.filter(goat => goat.category && goat.category === selectedGoatCategory);
 
   const hasGoats = goats.length > 0;
 
   // Get unique, valid categories from goats
-  const availableCategories = Array.from(
-    new Set(
-      goats
-        .filter(g => g.category) // Filter out goats with undefined categories
-        .map(g => g.category)
-    )
-  ).filter(Boolean); // Extra safety to remove any null/undefined values
 
   const handleClearAll = async (ownerUsername: string) => {
     if (!ownerUsername) return;
@@ -365,7 +355,6 @@ const GoatsCrud: React.FC = () => {
     setClearingMessages(true);
     try {
       const tableType = selectedSubgroup.is_realtime ? 'live_messages' : 'messages';
-      const isPublic = username.toLowerCase() === 'public';
 
       const { error } = await deleteMessages(selectedSubgroup.owner_username, username, tableType, 'DEFAULT');
       if (error) throw error;
@@ -584,42 +573,51 @@ const GoatsCrud: React.FC = () => {
 
               {/* Subgroups Grid with ScrollArea */}
               <ScrollArea className="flex-1 p-2 md:p-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2 md:gap-3">
-                  {subgroups.map((subgroup: any, index: number) => (
-                    <Card
-                      key={index}
-                      className={`cursor-pointer hover:shadow-md transition-shadow ${
-                        subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
-                      } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
-                      onClick={() => {
-                        setSelectedSubgroupDetails(subgroup);
-                        setSelectedSubgroup(subgroup);
-                        setIsMessagesOpen(true);
-                      }}
-                    >
-                      <CardHeader className="p-2 md:p-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 truncate">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-xs md:text-sm truncate">
-                                {subgroup.name || subgroup.metadata_with_translations?.name?.english}
-                              </h3>
-                              <Badge
-                                variant="secondary"
-                                className="h-5 min-w-[20px] px-1 flex items-center justify-center bg-gray-200 text-gray-500"
-                              >
-                                {subgroup.messagesCount || 0}
-                              </Badge>
+                {isLoadingChannels ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-gray-400"></div>
+                      <p className="text-sm text-gray-500">Loading channels...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-2 md:gap-3">
+                    {subgroups.map((subgroup: any, index: number) => (
+                      <Card
+                        key={index}
+                        className={`cursor-pointer hover:shadow-md transition-shadow ${
+                          subgroup.is_published ? 'bg-green-50' : 'bg-purple-50'
+                        } ${selectedSubgroupDetails?.username === subgroup.username ? 'ring-2 ring-primary' : ''}`}
+                        onClick={() => {
+                          setSelectedSubgroupDetails(subgroup);
+                          setSelectedSubgroup(subgroup);
+                          setIsMessagesOpen(true);
+                        }}
+                      >
+                        <CardHeader className="p-2 md:p-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 truncate">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-xs md:text-sm truncate">
+                                  {subgroup.name || subgroup.metadata_with_translations?.name?.english}
+                                </h3>
+                                <Badge
+                                  variant="secondary"
+                                  className="h-5 min-w-[20px] px-1 flex items-center justify-center bg-gray-200 text-gray-500"
+                                >
+                                  {subgroup.messagesCount || 0}
+                                </Badge>
+                              </div>
                             </div>
+                            <Badge variant="outline" className="text-[10px] md:text-xs">
+                              {subgroup.t === 'c' ? 'Channel' : 'Group'}
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="text-[10px] md:text-xs">
-                            {subgroup.t === 'c' ? 'Channel' : 'Group'}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                    </Card>
-                  ))}
-                </div>
+                        </CardHeader>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </ScrollArea>
             </div>
           ) : (
@@ -632,7 +630,7 @@ const GoatsCrud: React.FC = () => {
           )}
         </div>
 
-        {/* Messages Area - Discord Style */}
+        {/* Messages Area - Whatsapp Style */}
         <div className={`absolute inset-0 bg-[#313338] transition-transform duration-300 ${isMessagesOpen ? 'translate-x-0' : 'translate-x-[100%]'
           }`}>
           {/* Header with back button, name, and actions */}
@@ -708,4 +706,4 @@ const GoatsCrud: React.FC = () => {
   );
 };
 
-export default GoatsCrud;
+export default Whatsapp;

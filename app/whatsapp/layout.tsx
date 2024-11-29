@@ -7,7 +7,8 @@ export default function Layout(props: { children: React.ReactNode }) {
       <LandingPageHeader
         items={[
           { title: "Home", href: "/" },
-          { title: "GOATS", href: "/superadmin/goats" },
+          { title: "GOATS", href: "/goats" },
+          { title: "Whatsapp", href: "/whatsapp" },
           { title: "Store", href: "/superadmin/store" },
         ]}
       />
