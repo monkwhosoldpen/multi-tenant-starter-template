@@ -9,7 +9,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import useSuperAdmin from "@/lib/mock-provider";
-import { MessagesGrid } from "./chat/MessagesGrid";
 import { useRealtimeContext } from "@/lib/realtime-provider";
 import { RocketStatsModal } from "./RocketStatsModal";
 import { syncSubgroupWithRocket } from "@/lib/rocket-sync";
@@ -692,14 +691,6 @@ const GoatsCrud: React.FC = () => {
               </div>
             )}
           </div>
-
-          {/* Messages Content */}
-          {selectedSubgroup && (
-            <MessagesGrid
-              key={messagesKey}
-              subgroup={selectedSubgroup}
-            />
-          )}
         </div>
       </div>
     </div>
