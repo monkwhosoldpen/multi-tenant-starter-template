@@ -168,8 +168,12 @@ const ChannelList = () => {
     isLoadingChannels 
   } = useData();
 
+  // Move channel selection logic to a separate useEffect with minimal dependencies
   useEffect(() => {
-  }, [channels, selectedChannel, isLoadingChannels]);
+    if (!isLoadingChannels && channels?.length > 0 && !selectedChannel) {
+      handleChannelSelect(channels[0]);
+    }
+  }, [channels?.length, isLoadingChannels]); // Only depend on channels length and loading state
 
   if (isLoadingChannels) {
     return <LoadingChannels />;
