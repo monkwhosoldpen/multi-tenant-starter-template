@@ -9,14 +9,6 @@ import { $ReadOnlyArray } from '@nozbe/watermelondb/types';
 import { BehaviorSubject, Observable } from '@nozbe/watermelondb/utils/rx';
 import { Unsubscribe } from '@nozbe/watermelondb/utils/subscriptions';
 
-const debug = {
-  offline: (message: string, data?: any) => console.log(`🔌 [Offline] ${message}`, data || ''),
-  cache: (message: string, data?: any) => console.log(`📦 [Cache] ${message}`, data || ''),
-  sync: (message: string, data?: any) => console.log(`🔄 [Sync] ${message}`, data || ''),
-  db: (message: string, data?: any) => console.log(`💾 [DB] ${message}`, data || ''),
-  error: (message: string, error?: any) => console.error(`❌ [Error] ${message}`, error || '')
-};
-
 export interface ExtendedChannel extends ChannelType {
   msgs: number;
   _updatedAt: string;
@@ -29,7 +21,9 @@ interface DataContextType {
   selectedGoat: string;
   isLoadingChannels: boolean;
   isLoadingMessages: boolean;
-  isOfflineDisabled: boolean;
+  isOnlineMode: boolean;
+  handleOnlineToggle: (enabled: boolean) => Promise<void>;
+  setOnlineMode: (enabled: boolean) => void;
   wsStatus: 'connecting' | 'connected' | 'disconnected';
   handleChannelSelect: (channel: ExtendedChannel) => Promise<void>;
   handleOfflineToggle: (enabled: boolean) => Promise<void>;
@@ -153,7 +147,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     selectedGoat: "ElonMusk",
     isLoadingChannels: false,
     isLoadingMessages: false,
-    isOfflineDisabled: false
+    isOnlineMode: true
   });
 
   // Cache ref
@@ -191,7 +185,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         _updatedAt: msg._updatedAt || msg.updated_at || new Date().toISOString()
       };
     } catch (error) {
-      debug.error('Failed to map message:', error);
       return null;
     }
   }, []);
@@ -210,7 +203,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const results = await dbQuery.fetch();
       return results as unknown as T[];
     } catch (error) {
-      debug.error(`Failed to load from ${collection}:`, error);
       return [];
     }
   }, [database]);
@@ -228,7 +220,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         });
       });
     } catch (error) {
-      debug.error(`Failed to save to ${collection}:`, error);
     }
   }, [database]);
 
@@ -239,7 +230,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   ): T[] | null => {
     const cached = cache.current[type].get(key);
     if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-      debug.cache(`Using cached ${type} for ${key}`);
       return cached.data as T[];
     }
     return null;
@@ -254,7 +244,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       data: data as any, // Type assertion needed due to TypeScript limitation
       timestamp: Date.now()
     });
-    debug.cache(`Cached ${type} for ${key}`);
   }, []);
 
   // Message operations
@@ -317,7 +306,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Try database
       const dbChannels = await loadFromDb<ExtendedChannel>('channels');
-      if (dbChannels.length && state.isOfflineDisabled) {
+      if (dbChannels.length && state.isOnlineMode) {
         setState(prev => ({
           ...prev,
           channels: dbChannels,
@@ -342,7 +331,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Save to database in background
       if (channels.length) {
         Promise.all(channels.map((channel: ExtendedChannel) => saveToDb('channels', channel)))
-          .catch(error => debug.error('Failed to cache channels:', error));
+          .catch(error => console.error('Failed to cache channels:', error));
       }
 
       setState(prev => ({
@@ -352,19 +341,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }));
 
     } catch (error) {
-      debug.error('Channel initialization failed:', error);
       setState(prev => ({
         ...prev,
         channels: [],
         isLoadingChannels: false
       }));
     }
-  }, [state.isOfflineDisabled, dbOps, getCachedData, setCachedData, loadFromDb, saveToDb]);
+  }, [state.isOnlineMode, dbOps, getCachedData, setCachedData, loadFromDb, saveToDb]);
 
   // Channel selection
   const handleChannelSelect = useCallback(async (channel: ExtendedChannel) => {
     if (state.selectedChannel?._id === channel._id) {
-      debug.cache('Channel already selected, skipping');
       return;
     }
 
@@ -388,7 +375,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Try database
       const dbMessages = await loadMessagesFromDb(channel._id);
-      if (dbMessages.length && state.isOfflineDisabled) {
+      if (dbMessages.length && state.isOnlineMode) {
         setState(prev => ({
           ...prev,
           messages: dbMessages,
@@ -408,7 +395,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Save to database in background
       if (messages.length) {
         Promise.all(messages.map((msg: MessageType) => saveMessageToDb(msg)))
-          .catch(error => debug.error('Failed to cache messages:', error));
+          .catch(error => console.error('Failed to cache messages:', error));
       }
 
       setState(prev => ({
@@ -418,7 +405,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }));
 
     } catch (error) {
-      debug.error('Channel selection failed:', error);
       setState(prev => ({
         ...prev,
         messages: [],
@@ -427,7 +413,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [
     state.selectedChannel,
-    state.isOfflineDisabled,
+    state.isOnlineMode,
     dbOps,
     mapMessage,
     getCachedData,
@@ -439,11 +425,9 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Offline mode toggle
   const debouncedOfflineToggle = useCallback(
     debounce(async (enabled: boolean) => {
-      debug.offline(`Toggling offline mode: ${enabled ? 'ON' : 'OFF'}`);
       
       try {
         if (enabled) {
-          debug.sync('Syncing data before enabling offline mode');
           await Promise.all([
             ...state.messages.map(msg => saveMessageToDb(msg)),
             ...state.channels.map(channel => saveChannelToDb(channel))
@@ -452,17 +436,46 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         setState(prev => ({
           ...prev,
-          isOfflineDisabled: !enabled
+          isOnlineMode: !enabled
         }));
 
         if (state.selectedChannel) {
           await handleChannelSelect(state.selectedChannel);
         }
       } catch (error) {
-        debug.error('Failed to toggle offline mode:', error);
         setState(prev => ({
           ...prev,
-          isOfflineDisabled: enabled
+          isOnlineMode: enabled
+        }));
+      }
+    }, 300),
+    [state, saveMessageToDb, saveChannelToDb]
+  );
+
+  // Online/Offline mode toggle
+  const debouncedOnlineToggle = useCallback(
+    debounce(async (enabled: boolean) => {
+      
+      try {
+        if (!enabled) {
+          await Promise.all([
+            ...state.messages.map(msg => saveMessageToDb(msg)),
+            ...state.channels.map(channel => saveChannelToDb(channel))
+          ]);
+        }
+
+        setState(prev => ({
+          ...prev,
+          isOnlineMode: enabled
+        }));
+
+        if (state.selectedChannel) {
+          await handleChannelSelect(state.selectedChannel);
+        }
+      } catch (error) {
+        setState(prev => ({
+          ...prev,
+          isOnlineMode: !enabled
         }));
       }
     }, 300),
@@ -473,15 +486,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     return () => {
       debouncedOfflineToggle.cancel();
+      debouncedOnlineToggle.cancel();
     };
-  }, [debouncedOfflineToggle]);
+  }, [debouncedOfflineToggle, debouncedOnlineToggle]);
 
   // Context value with all required properties
   const contextValue = useMemo<DataContextType>(() => ({
     ...state,
     handleOfflineToggle: debouncedOfflineToggle,
     setOfflineDisabled: (disabled: boolean) => 
-      setState(prev => ({ ...prev, isOfflineDisabled: disabled })),
+      setState(prev => ({ ...prev, isOnlineMode: disabled })),
+    handleOnlineToggle: debouncedOnlineToggle,
+    setOnlineMode: (enabled: boolean) => 
+      setState(prev => ({ ...prev, isOnlineMode: enabled })),
     wsStatus,
     loadMessagesFromDb,
     saveMessageToDb,
@@ -494,6 +511,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }), [
     state,
     debouncedOfflineToggle,
+    debouncedOnlineToggle,
     wsStatus,
     loadMessagesFromDb,
     saveMessageToDb,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo, useCallback } from "react";
 import { useData } from '@/lib/data-provider';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -11,23 +11,8 @@ import { MessageType, ChannelType } from '@/lib/models/schema';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-// Debug logging utility
-const debug = {
-  ui: (message: string, data?: any) => console.log(`🎨 [UI] ${message}`, data || ''),
-  state: (message: string, data?: any) => console.log(`📊 [State] ${message}`, data || ''),
-  event: (message: string, data?: any) => console.log(`🎯 [Event] ${message}`, data || ''),
-  render: (message: string, data?: any) => console.log(`🔄 [Render] ${message}`, data || ''),
-  error: (message: string, error?: any) => console.error(`❌ [Error] ${message}`, error || ''),
-  switch: (message: string, data?: any) => console.log(`🔀 [Switch] ${message}`, data || ''),
-  loader: (message: string, data?: any) => console.log(`⏳ [Loader] ${message}`, data || ''),
-  persistence: (message: string, data?: any) => console.log(`💾 [Persistence] ${message}`, data || ''),
-  channel: (message: string, data?: any) => console.log(`📺 [Channel] ${message}`, data || ''),
-  message: (message: string, data?: any) => console.log(`💬 [Message] ${message}`, data || '')
-};
-
 // Loading Components
 const LoadingChannels = () => {
-  debug.loader('Showing channel loading skeleton');
   return (
     <div className="flex flex-col items-center gap-3 p-2">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -42,7 +27,6 @@ const LoadingChannels = () => {
 };
 
 const LoadingMessages = () => {
-  debug.loader('Showing message loading skeleton');
   return (
     <div className="flex items-center justify-center h-full">
       <div className="flex flex-col items-center gap-2">
@@ -54,7 +38,6 @@ const LoadingMessages = () => {
 };
 
 const EmptyMessages = () => {
-  debug.render('Rendering EmptyMessages');
   return (
     <div className="flex items-center justify-center h-full text-gray-400">
       <p>No messages yet</p>
@@ -64,16 +47,9 @@ const EmptyMessages = () => {
 
 // Message Components
 const MessageItem: React.FC<{ message: MessageType }> = ({ message }) => {
-  debug.render('Rendering MessageItem', { messageId: message._id });
   
   const timestamp = new Date(message.ts);
   const isValidDate = !isNaN(timestamp.getTime());
-  
-  debug.state('Message timestamp state', {
-    raw: message.ts,
-    parsed: timestamp,
-    isValid: isValidDate
-  });
 
   return (
     <div className="group rounded p-2 hover:bg-[#2e3035]">
@@ -94,17 +70,12 @@ const ChannelItem: React.FC<{
   isSelected: boolean;
   onSelect: () => void;
 }> = ({ channel, isSelected, onSelect }) => {
-  debug.render('Rendering ChannelItem', {
-    channelId: channel._id,
-    isSelected
-  });
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
           onClick={() => {
-            debug.event('Channel selected', { channelId: channel._id });
             onSelect();
           }}
           className="relative group"
@@ -131,26 +102,33 @@ const ChannelItem: React.FC<{
 };
 
 // Header Component
-const PageHeader = () => {
+const PageHeader = memo(() => {
   const { 
     selectedChannel, 
     wsStatus, 
     selectedGoat,
     setSelectedGoat,
-    isOfflineDisabled,
-    handleOfflineToggle 
+    isOnlineMode,
+    handleOnlineToggle
   } = useData();
 
-  debug.render('Rendering PageHeader', {
-    selectedChannel: selectedChannel?.name,
-    wsStatus,
-    selectedGoat,
-    isOfflineDisabled
-  });
-
+  // Log switch state changes only, not on every render
   useEffect(() => {
-    debug.persistence('Offline mode state persisted', { isOfflineDisabled });
-  }, [isOfflineDisabled]);
+    console.log('🔌 [Connection Status]', {
+      mode: isOnlineMode ? 'ONLINE' : 'OFFLINE',
+      timestamp: new Date().toISOString(),
+      selectedChannel: selectedChannel?.name || 'none'
+    });
+  }, [isOnlineMode, selectedChannel]);
+
+  const handleSwitchChange = useCallback((checked: boolean) => {
+    console.log('🎯 [Switch Action]', {
+      from: isOnlineMode ? 'ONLINE' : 'OFFLINE',
+      to: checked ? 'ONLINE' : 'OFFLINE',
+      timestamp: new Date().toISOString()
+    });
+    handleOnlineToggle(checked);
+  }, [isOnlineMode, handleOnlineToggle]);
 
   return (
     <div className="px-4 py-3 border-b border-[#3f4147] bg-[#2B2D31]">
@@ -162,32 +140,24 @@ const PageHeader = () => {
         )}
         
         <div className="ml-auto flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-400">Offline Mode</span>
-            <Switch
-              checked={!isOfflineDisabled}
-              onCheckedChange={(checked) => {
-                debug.switch('Offline mode toggled', { 
-                  newState: checked,
-                  previousState: !isOfflineDisabled,
-                  timestamp: new Date().toISOString()
-                });
-                handleOfflineToggle(checked);
-              }}
-              aria-label="Toggle offline mode"
-            />
-          </div>
+          <Switch
+            checked={isOnlineMode}
+            onCheckedChange={handleSwitchChange}
+            className={`${isOnlineMode ? 'bg-green-500' : 'bg-red-500'}`}
+            aria-label="Toggle online/offline mode"
+          />
           <div 
             className={`h-2 w-2 rounded-full ${
-              wsStatus === 'connected' ? 'bg-green-500' : 
-              wsStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+              isOnlineMode ? 'bg-green-500' : 'bg-red-500'
             }`} 
           />
         </div>
       </div>
     </div>
   );
-};
+});
+
+PageHeader.displayName = 'PageHeader';
 
 // Channel List Component
 const ChannelList = () => {
@@ -198,22 +168,10 @@ const ChannelList = () => {
     isLoadingChannels 
   } = useData();
 
-  debug.render('Rendering ChannelList', {
-    channelCount: channels.length,
-    selectedChannelId: selectedChannel?._id,
-    isLoading: isLoadingChannels
-  });
-
   useEffect(() => {
-    debug.channel('Channel state updated', {
-      count: channels.length,
-      selectedId: selectedChannel?._id,
-      loading: isLoadingChannels
-    });
   }, [channels, selectedChannel, isLoadingChannels]);
 
   if (isLoadingChannels) {
-    debug.loader('Channel list loading');
     return <LoadingChannels />;
   }
 
@@ -240,24 +198,13 @@ const MessageList = () => {
   const { messages, isLoadingMessages } = useData();
 
   useEffect(() => {
-    debug.message('Messages state updated', {
-      count: messages.length,
-      messages: messages.map(m => ({ 
-        id: m._id, 
-        content: m.msg.substring(0, 50),
-        timestamp: m.ts
-      })),
-      loading: isLoadingMessages
-    });
   }, [messages, isLoadingMessages]);
 
   if (isLoadingMessages) {
-    debug.loader('Message list loading');
     return <LoadingMessages />;
   }
 
   if (!messages?.length) {
-    debug.message('No messages to display');
     return <EmptyMessages />;
   }
 
@@ -279,13 +226,7 @@ const MessageList = () => {
 const MessageInput = () => {
   const [message, setMessage] = useState("");
   
-  debug.render('Rendering MessageInput', {
-    hasMessage: message.length > 0
-  });
-
   const handleSend = () => {
-    debug.event('Message send attempted', { message });
-    // TODO: Implement send message
     setMessage("");
   };
 
@@ -295,7 +236,6 @@ const MessageInput = () => {
         <Input
           value={message}
           onChange={(e) => {
-            debug.event('Message input changed', { value: e.target.value });
             setMessage(e.target.value);
           }}
           placeholder="Type a message..."
@@ -318,16 +258,12 @@ export default function WhatsappPage() {
   const { initializeChannels, selectedGoat } = useData();
 
   useEffect(() => {
-    debug.state('WhatsappPage mounted', { selectedGoat });
-    
+   
     const initialize = async () => {
       if (selectedGoat) {
-        debug.event('Initializing channels', { selectedGoat });
         try {
           await initializeChannels(selectedGoat);
-          debug.persistence('Initial channel state loaded');
         } catch (error) {
-          debug.error('Failed to initialize channels:', error);
         }
       }
     };
@@ -335,11 +271,8 @@ export default function WhatsappPage() {
     initialize();
 
     return () => {
-      debug.state('WhatsappPage unmounted');
     };
   }, [selectedGoat, initializeChannels]);
-
-  debug.render('Rendering WhatsappPage');
 
   return (
     <div className="h-screen flex flex-col">
