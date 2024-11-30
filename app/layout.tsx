@@ -24,21 +24,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <RealtimeProvider>
-          <OfflineProvider>
-            <DataProvider>
-              <Provider>
-                <StackProvider app={stackServerApp}>
-                  <>
-                    <StackTheme theme={{ dark: { background: '#171717' } }}>
-                      {children}
-                    </StackTheme>
-                  </>
-                </StackProvider>
-              </Provider>
-            </DataProvider>
-          </OfflineProvider>
-        </RealtimeProvider>
+        <StackProvider app={stackServerApp}>
+          <>
+            <StackTheme theme={{ dark: { background: '#171717' } }}>
+              {children}
+            </StackTheme>
+          </>
+        </StackProvider>
       </body>
     </html>
   );
