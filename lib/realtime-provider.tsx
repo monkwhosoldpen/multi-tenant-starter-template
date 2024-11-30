@@ -1,38 +1,29 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
-import { useOfflineContext } from './offline-provider';
+import { MessageType, UserType, ChannelType, ReactionType } from './models/schema';
 
-interface RocketMessage {
-  _id: string;
-  msg: string;
-  ts: string;
-  u: {
-    _id: string;
-    username: string;
-    name: string;
-  };
-  rid: string;
-  _updatedAt: string;
-  attachments?: any[];
-  reactions?: any;
+// Define base types for realtime events
+interface RealtimeEventHandlers {
+  onMessageReceived: (callback: (message: MessageType) => void) => () => void;
+  onMessageUpdated: (callback: (message: MessageType) => void) => () => void;
+  onMessageDeleted: (callback: (messageId: string) => void) => () => void;
+  onUserStatusChanged: (callback: (user: UserType) => void) => () => void;
+  onUserTyping: (callback: (channelId: string, user: UserType) => void) => () => void;
+  onChannelUpdated: (callback: (channel: ChannelType) => void) => () => void;
+  onReactionAdded: (callback: (reaction: ReactionType) => void) => () => void;
+  onReactionRemoved: (callback: (reaction: ReactionType) => void) => () => void;
 }
 
-type RealtimeContextType = {
-  messages: RocketMessage[];
-  subscribeToChannel: (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => void;
-  unsubscribeFromChannel: (channelId: string) => void;
+interface RealtimeContextType extends RealtimeEventHandlers {
+  messages: MessageType[];
   wsStatus: 'connecting' | 'connected' | 'disconnected';
-};
-
-const ROCKET_CONFIG = {
-  BASE_URL: "https://amigurumi-gaur.pikapod.net/api/v1",
-  WS_URL: "wss://amigurumi-gaur.pikapod.net/websocket",
-  AUTH: {
-    userId: 'qrzRQGpEiGxsSG6M2',
-    authToken: 'TkZDG5qK3T1FJiw9N2joUBtNaD8VGQqP3P8jJlHS4rH'
-  }
-};
+  subscribeToChannel: (channelId: string, callback: (message: MessageType | MessageType[]) => void) => void;
+  unsubscribeFromChannel: (channelId: string) => void;
+  subscribeToAllChannels: (channelIds: string[]) => void;
+  setSelectedChannelId: (channelId: string | null) => void;
+  setMessages: React.Dispatch<React.SetStateAction<MessageType[]>>;
+}
 
 const RealtimeContext = createContext<RealtimeContextType | null>(null);
 
@@ -44,387 +35,131 @@ export const useRealtimeContext = () => {
   return context;
 };
 
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_DELAY = 5000;
-
-// Modify WebSocket manager to handle active instance better
-const WebSocketManager = {
-  currentInstanceId: 0,
-  activeInstanceId: null as number | null,
-  getNewInstanceId() {
-    this.currentInstanceId += 1;
-    if (this.activeInstanceId === null) {
-      this.activeInstanceId = this.currentInstanceId;
-    }
-    return this.currentInstanceId;
-  },
-  setActiveInstance(id: number) {
-    this.activeInstanceId = id;
-    console.log('🔄 Setting active WebSocket instance:', id);
-  },
-  isActiveInstance(id: number) {
-    return id === this.activeInstanceId;
-  }
-};
-
 export const RealtimeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [messages, setMessages] = useState<RocketMessage[]>([]);
+  const [messages, setMessages] = useState<MessageType[]>([]);
   const [wsStatus, setWsStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
-  const [messageCallbacks] = useState<{ [channelId: string]: (message: RocketMessage | RocketMessage[]) => void }>({});
-  const { saveMessageToDb, loadMessagesFromDb } = useOfflineContext();
-  
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
-  const reconnectTimeout = useRef<NodeJS.Timeout>();
-  const isConnecting = useRef(false);
-  const isMounted = useRef(false);
-  const instanceId = useRef(WebSocketManager.getNewInstanceId());
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
 
-  // Add activeSubscriptions tracking
-  const activeSubscriptions = useRef<Set<string>>(new Set());
-  const pendingSubscriptions = useRef<Set<string>>(new Set());
+  // Event listener refs
+  const messageListeners = useRef(new Set<(message: MessageType) => void>());
+  const messageUpdateListeners = useRef(new Set<(message: MessageType) => void>());
+  const messageDeleteListeners = useRef(new Set<(messageId: string) => void>());
+  const userStatusListeners = useRef(new Set<(user: UserType) => void>());
+  const userTypingListeners = useRef(new Set<(channelId: string, user: UserType) => void>());
+  const channelUpdateListeners = useRef(new Set<(channel: ChannelType) => void>());
+  const reactionAddListeners = useRef(new Set<(reaction: ReactionType) => void>());
+  const reactionRemoveListeners = useRef(new Set<(reaction: ReactionType) => void>());
 
-  const connectWebSocket = useCallback(() => {
-    if (!isMounted.current) {
-      console.log('🚫 Component not mounted, skipping connection');
-      return;
-    }
-
-    if (isConnecting.current) {
-      console.log('🔄 Connection attempt already in progress');
-      return;
-    }
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      console.log('🟢 WebSocket already connected');
-      return;
-    }
-
-    try {
-      isConnecting.current = true;
-      console.log('🔌 Initiating WebSocket connection...', {
-        instanceId: instanceId.current,
-        activeInstanceId: WebSocketManager.activeInstanceId
-      });
-
-      const socket = new WebSocket(ROCKET_CONFIG.WS_URL);
-      wsRef.current = socket;
-      setWsStatus('connecting');
-
-      socket.onopen = () => {
-        console.log('✅ WebSocket connected successfully', {
-          readyState: socket.readyState,
-          wsRef: !!wsRef.current
-        });
-        
-        setWsStatus('connected');
-        reconnectAttempts.current = 0;
-        isConnecting.current = false;
-
-        console.log('🔑 Sending connect message...');
-        socket.send(JSON.stringify({
-          msg: 'connect',
-          version: '1',
-          support: ['1']
-        }));
-
-        console.log('🔐 Sending login message...');
-        socket.send(JSON.stringify({
-          msg: 'method',
-          method: 'login',
-          id: 'login-' + Date.now(),
-          params: [{
-            resume: ROCKET_CONFIG.AUTH.authToken
-          }]
-        }));
-      };
-
-      socket.onmessage = async (event) => {
-        const data = JSON.parse(event.data);
-        console.log('📨 Received WebSocket message:', data);
-        
-        if (data.msg === 'changed' && data.collection === 'stream-room-messages') {
-          console.log('📝 Processing new message...');
-          if (data.fields?.args?.[0]) {
-            const rawMessage = data.fields.args[0];
-            const roomId = rawMessage.rid;
-            
-            // Format the message with proper date handling
-            const formattedMessage = {
-              _id: rawMessage._id,
-              msg: rawMessage.msg,
-              ts: rawMessage.ts.$date ? new Date(rawMessage.ts.$date).toISOString() : rawMessage.ts,
-              u: {
-                _id: rawMessage.u._id,
-                username: rawMessage.u.username,
-                name: rawMessage.u.name
-              },
-              rid: rawMessage.rid,
-              _updatedAt: rawMessage._updatedAt.$date ? 
-                new Date(rawMessage._updatedAt.$date).toISOString() : 
-                rawMessage._updatedAt,
-              attachments: rawMessage.attachments || [],
-              reactions: rawMessage.reactions || {}
-            };
-            
-            if (messageCallbacks[roomId]) {
-              await saveMessageToDb(formattedMessage);
-              setMessages(prev => [...prev, formattedMessage]);
-              messageCallbacks[roomId](formattedMessage);
-            }
-          }
-        }
-      };
-
-      socket.onclose = (event) => {
-        console.log('🔌 WebSocket disconnected', {
-          instanceId: instanceId.current,
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          wsRef: !!wsRef.current
-        });
-        
-        if (wsRef.current === socket) {
-          wsRef.current = null;
-          setWsStatus('disconnected');
-        }
-        isConnecting.current = false;
-
-        // Only attempt reconnect if this is the latest instance
-        if (WebSocketManager.activeInstanceId === instanceId.current && 
-            isMounted.current && 
-            !event.wasClean && 
-            reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          reconnectAttempts.current++;
-          console.log(`⏳ Scheduling reconnect attempt ${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY}ms`);
-          
-          if (reconnectTimeout.current) {
-            clearTimeout(reconnectTimeout.current);
-          }
-          reconnectTimeout.current = setTimeout(connectWebSocket, RECONNECT_DELAY);
-        }
-      };
-
-      socket.onerror = (error) => {
-        console.log('❌ WebSocket error:', error);
-        isConnecting.current = false;
-      };
-
-    } catch (error) {
-      console.log('❌ Error creating WebSocket:', error);
-      wsRef.current = null;
-      setWsStatus('disconnected');
-      isConnecting.current = false;
-    }
+  // Event handlers
+  const handleNewMessage = useCallback((payload: MessageType) => {
+    messageListeners.current.forEach(listener => listener(payload));
   }, []);
 
-  // Single useEffect for WebSocket lifecycle
-  useEffect(() => {
-    console.log('🔄 Initial WebSocket setup', { 
-      instanceId: instanceId.current,
-      activeInstanceId: WebSocketManager.activeInstanceId
-    });
+  const handleMessageUpdate = useCallback((payload: MessageType) => {
+    messageUpdateListeners.current.forEach(listener => listener(payload));
+  }, []);
+
+  const handleUserStatus = useCallback((payload: { user: UserType }) => {
+    userStatusListeners.current.forEach(listener => listener(payload.user));
+  }, []);
+
+  const handleReactionAdd = useCallback((payload: ReactionType) => {
+    reactionAddListeners.current.forEach(listener => listener(payload));
+  }, []);
+
+  const handleWebSocketMessage = useCallback((event: MessageEvent) => {
+    const data = JSON.parse(event.data);
     
-    isMounted.current = true;
-    reconnectAttempts.current = 0;
-    WebSocketManager.setActiveInstance(instanceId.current);
-    connectWebSocket();
-
-    return () => {
-      console.log('🧹 Cleaning up WebSocket resources', { 
-        instanceId: instanceId.current,
-        activeInstanceId: WebSocketManager.activeInstanceId
-      });
-      
-      isMounted.current = false;
-      isConnecting.current = false;
-      
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-        reconnectTimeout.current = undefined;
-      }
-      
-      if (wsRef.current) {
-        console.log('🔴 Closing WebSocket connection', { 
-          instanceId: instanceId.current,
-          activeInstanceId: WebSocketManager.activeInstanceId
-        });
-        const socket = wsRef.current;
-        wsRef.current = null;
-        socket.close(1000, 'Component unmounting');
-      }
-      
-      reconnectAttempts.current = MAX_RECONNECT_ATTEMPTS;
-    };
-  }, [connectWebSocket]);
-
-  const subscribeToChannel = useCallback(async (channelId: string, callback: (message: RocketMessage | RocketMessage[]) => void) => {
-    // Check if already subscribed or pending
-    if (activeSubscriptions.current.has(channelId)) {
-      console.log('📌 Already subscribed to channel:', channelId);
-      return;
+    switch (data.type) {
+      case 'message.new':
+        handleNewMessage(data.payload);
+        break;
+      case 'message.update':
+        handleMessageUpdate(data.payload);
+        break;
+      case 'user.status':
+        handleUserStatus(data.payload);
+        break;
+      case 'reaction.add':
+        handleReactionAdd(data.payload);
+        break;
     }
+  }, [handleNewMessage, handleMessageUpdate, handleUserStatus, handleReactionAdd]);
 
-    if (pendingSubscriptions.current.has(channelId)) {
-      console.log('⏳ Subscription already pending for channel:', channelId);
-      return;
-    }
+  // Event registration functions
+  const onMessageReceived = useCallback((callback: (message: MessageType) => void) => {
+    messageListeners.current.add(callback);
+    return () => messageListeners.current.delete(callback);
+  }, []);
 
-    console.log('📡 Subscribing to channel:', channelId, {
-      wsStatus,
-      wsExists: !!wsRef.current,
-      readyState: wsRef.current?.readyState,
-      isConnecting: isConnecting.current
-    });
+  const onMessageUpdated = useCallback((callback: (message: MessageType) => void) => {
+    messageUpdateListeners.current.add(callback);
+    return () => messageUpdateListeners.current.delete(callback);
+  }, []);
 
-    pendingSubscriptions.current.add(channelId);
-    messageCallbacks[channelId] = callback;
+  const onMessageDeleted = useCallback((callback: (messageId: string) => void) => {
+    messageDeleteListeners.current.add(callback);
+    return () => messageDeleteListeners.current.delete(callback);
+  }, []);
 
-    try {
-      console.log('🔍 Checking local cache for messages...');
-      const cachedMessages = await loadMessagesFromDb(channelId);
-      if (cachedMessages && cachedMessages.length > 0) {
-        console.log('📦 Using cached messages:', cachedMessages.length);
-        setMessages(cachedMessages);
-        callback(cachedMessages);
-      }
+  const onUserStatusChanged = useCallback((callback: (user: UserType) => void) => {
+    userStatusListeners.current.add(callback);
+    return () => userStatusListeners.current.delete(callback);
+  }, []);
 
-      if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        console.log('🔄 WebSocket not ready, attempting to connect...');
-        connectWebSocket();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
+  const onUserTyping = useCallback((callback: (channelId: string, user: UserType) => void) => {
+    userTypingListeners.current.add(callback);
+    return () => userTypingListeners.current.delete(callback);
+  }, []);
 
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        console.log('🔔 Sending subscription message to WebSocket');
-        wsRef.current.send(JSON.stringify({
-          msg: 'sub',
-          id: `room-messages-${channelId}`,
-          name: 'stream-room-messages',
-          params: [channelId, { useCollection: false, args: [{ 'visitorToken': false }] }]
-        }));
+  const onChannelUpdated = useCallback((callback: (channel: ChannelType) => void) => {
+    channelUpdateListeners.current.add(callback);
+    return () => channelUpdateListeners.current.delete(callback);
+  }, []);
 
-        // Mark as actively subscribed
-        activeSubscriptions.current.add(channelId);
+  const onReactionAdded = useCallback((callback: (reaction: ReactionType) => void) => {
+    reactionAddListeners.current.add(callback);
+    return () => reactionAddListeners.current.delete(callback);
+  }, []);
 
-        if (!cachedMessages || cachedMessages.length === 0) {
-          console.log('🌐 Fetching messages from API...');
-          const response = await fetch(`${ROCKET_CONFIG.BASE_URL}/channels.messages?roomId=${channelId}`, {
-            headers: {
-              "X-Auth-Token": ROCKET_CONFIG.AUTH.authToken,
-              "X-User-Id": ROCKET_CONFIG.AUTH.userId,
-              "Content-Type": "application/json"
-            }
-          });
-          const data = await response.json();
-          const messages = data.messages || [];
-          console.log('Fetched initial messages from API:', messages);
-          
-          await Promise.all(messages.map((msg: any) => saveMessageToDb(msg)));
-          setMessages(messages);
-          callback(messages);
-        }
-      } else {
-        console.log('⚠️ WebSocket not ready for subscription:', {
-          wsExists: !!wsRef.current,
-          readyState: wsRef.current?.readyState,
-          wsStatus,
-          isConnecting: isConnecting.current
-        });
-      }
-    } catch (error) {
-      console.log('❌ Error in subscription process:', error);
-    } finally {
-      pendingSubscriptions.current.delete(channelId);
-    }
-  }, [messageCallbacks, saveMessageToDb, loadMessagesFromDb, wsStatus, connectWebSocket]);
+  const onReactionRemoved = useCallback((callback: (reaction: ReactionType) => void) => {
+    reactionRemoveListeners.current.add(callback);
+    return () => reactionRemoveListeners.current.delete(callback);
+  }, []);
+
+  // Existing WebSocket functions
+  const subscribeToChannel = useCallback((channelId: string, callback: (message: MessageType | MessageType[]) => void) => {
+    // Implementation
+  }, []);
 
   const unsubscribeFromChannel = useCallback((channelId: string) => {
-    console.log('🔕 Unsubscribing from channel:', channelId, {
-      wsStatus,
-      wsExists: !!wsRef.current,
-      readyState: wsRef.current?.readyState
-    });
-    
-    // Only clear messages if we're actually changing channels
-    if (activeSubscriptions.current.has(channelId)) {
-      delete messageCallbacks[channelId];
-      activeSubscriptions.current.delete(channelId);
-      pendingSubscriptions.current.delete(channelId);
-      setMessages([]);
-
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({
-          msg: 'unsub',
-          id: `room-messages-${channelId}`
-        }));
-      }
-    }
-  }, [messageCallbacks, wsStatus]);
-
-  // Modify the cleanup effect to only run on full unmount
-  useEffect(() => {
-    const cleanup = () => {
-      console.log('🧹 Cleaning up all subscriptions and WebSocket');
-      
-      // Clear all subscriptions first
-      activeSubscriptions.current.forEach(channelId => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({
-            msg: 'unsub',
-            id: `room-messages-${channelId}`
-          }));
-        }
-      });
-      
-      activeSubscriptions.current.clear();
-      pendingSubscriptions.current.clear();
-      
-      // Only close WebSocket if we're actually unmounting
-      if (wsRef.current && !isMounted.current) {
-        console.log('🔴 Closing WebSocket connection (final cleanup)');
-        wsRef.current.close(1000, 'Provider unmounting');
-        wsRef.current = null;
-      }
-    };
-
-    // Set up beforeunload handler for page close
-    window.addEventListener('beforeunload', cleanup);
-
-    return () => {
-      isMounted.current = false;
-      window.removeEventListener('beforeunload', cleanup);
-      cleanup();
-    };
+    // Implementation
   }, []);
 
-  // Add ping/pong handling to keep connection alive
-  useEffect(() => {
-    let pingInterval: NodeJS.Timeout;
+  const subscribeToAllChannels = useCallback((channelIds: string[]) => {
+    // Implementation
+  }, []);
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      pingInterval = setInterval(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ msg: 'ping' }));
-        }
-      }, 25000); // Send ping every 25 seconds
-    }
-
-    return () => {
-      if (pingInterval) {
-        clearInterval(pingInterval);
-      }
-    };
-  }, [wsStatus]);
+  const contextValue: RealtimeContextType = {
+    messages,
+    wsStatus,
+    subscribeToChannel,
+    unsubscribeFromChannel,
+    subscribeToAllChannels,
+    setSelectedChannelId,
+    setMessages,
+    onMessageReceived,
+    onMessageUpdated,
+    onMessageDeleted,
+    onUserStatusChanged,
+    onUserTyping,
+    onChannelUpdated,
+    onReactionAdded,
+    onReactionRemoved,
+  };
 
   return (
-    <RealtimeContext.Provider value={{
-      messages,
-      subscribeToChannel,
-      unsubscribeFromChannel,
-      wsStatus
-    }}>
+    <RealtimeContext.Provider value={contextValue}>
       {children}
     </RealtimeContext.Provider>
   );

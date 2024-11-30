@@ -5,8 +5,9 @@ import { stackServerApp } from "../stack";
 import "./globals.css";
 import { Provider } from "./provider";
 import { SuperadminProvider } from "@/lib/mock-provider";
-import { RealtimeProvider } from "@/lib/realtime-provider";
-import { OfflineProvider } from "@/lib/offline-provider";
+import { DataProvider } from '@/lib/data-provider';
+import { RealtimeProvider } from '@/lib/realtime-provider';
+import { OfflineProvider } from '@/lib/offline-provider';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -23,19 +24,21 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <OfflineProvider disableOffline={false}>
-          <RealtimeProvider>
-            <Provider>
-              <StackProvider app={stackServerApp}>
-                <SuperadminProvider>
-                  <StackTheme theme={{ dark: { background: '#171717' } }}>
-                    {children}
-                  </StackTheme>
-                </SuperadminProvider>
-              </StackProvider>
-            </Provider>
-          </RealtimeProvider>
-        </OfflineProvider>
+        <RealtimeProvider>
+          <OfflineProvider>
+            <DataProvider>
+              <Provider>
+                <StackProvider app={stackServerApp}>
+                  <>
+                    <StackTheme theme={{ dark: { background: '#171717' } }}>
+                      {children}
+                    </StackTheme>
+                  </>
+                </StackProvider>
+              </Provider>
+            </DataProvider>
+          </OfflineProvider>
+        </RealtimeProvider>
       </body>
     </html>
   );
