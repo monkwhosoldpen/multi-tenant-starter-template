@@ -31,8 +31,6 @@ export const OfflineProvider: React.FC<{
   const [isInitialized, setIsInitialized] = useState(false);
   const [isOfflineDisabled, setOfflineDisabled] = useState(disableOffline);
 
-  // ... rest of implementation ...
-
   return (
     <OfflineContext.Provider value={{
       database,
